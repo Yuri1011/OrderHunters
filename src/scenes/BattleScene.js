@@ -84,11 +84,16 @@ export class BattleScene extends Phaser.Scene {
         skillText.on('pointerdown', () => {
             this.skillAttack()
         })
+
+        // Сохраняем кнопки, чтобы можно было включать/выключать их во время хода врага 
+        this.actionButtons = [attackText, defendText, skillText]
     }
 
     defend() {
         if (this.turn !== 'player') return
         if (this.hunterHP <= 0 || this.trollHP <= 0) return
+
+        this.setActionButtonsEnabled(false)
 
         this.isDefending = true
         this.turn = 'enemy'
@@ -102,6 +107,8 @@ export class BattleScene extends Phaser.Scene {
         if (this.turn !== 'player') return
         if (this.trollHP <= 0) return
 
+        this.setActionButtonsEnabled(false)
+
         const damage = Phaser.Math.Between(20, 40)
         this.trollHP -= damage
         this.trollHP = Math.max(this.trollHP, 0)
@@ -109,6 +116,7 @@ export class BattleScene extends Phaser.Scene {
         this.trollHPText.setText('HP: ' + Math.max(this.trollHP, 0))
 
         this.showDamage(this.troll.x, this.troll.y - 100, damage)
+        this.hitEffect(this.troll)
 
         this.drawHPBars()
 
@@ -141,6 +149,8 @@ export class BattleScene extends Phaser.Scene {
         if (this.turn !== 'player') return
         if (this.trollHP <= 0) return
 
+        this.setActionButtonsEnabled(false)
+
         const damage = Phaser.Math.Between(10, 25)
         this.trollHP -= damage
         this.trollHP = Math.max(this.trollHP, 0)
@@ -148,6 +158,7 @@ export class BattleScene extends Phaser.Scene {
         this.trollHPText.setText('HP: ' + Math.max(this.trollHP, 0))
 
         this.showDamage(this.troll.x, this.troll.y - 100, damage)
+        this.hitEffect(this.troll)
 
         this.drawHPBars()
 
@@ -194,7 +205,7 @@ export class BattleScene extends Phaser.Scene {
         this.hunterHPText.setText('HP: ' + Math.max(this.hunterHP, 0))
 
         this.showDamage(this.hunter.x, this.hunter.y - 100, damage)
-
+        this.hitEffect(this.hunter)
         this.drawHPBars()
 
         this.tweens.add({
@@ -217,6 +228,37 @@ export class BattleScene extends Phaser.Scene {
 
         // возвращаем ход игроку
         this.turn = 'player'
+        this.setActionButtonsEnabled(true)
+    }
+
+    hitEffect(target) {
+        // Лёгкая тряска камеры при ударе
+        this.cameras.main.shake(100, 0.004)
+
+        // Быстрое мигание цели, чтобы удар ощущался визуально
+        this.tweens.add({
+            targets: target,
+            alpha: 0.35,
+            duration: 80,
+            yoyo: true,
+            repeat: 2,
+            onComplete: () => {
+                target.setAlpha(1)
+            }
+        })
+    }
+
+    setActionButtonsEnabled(isEnabled) {
+        // Во время хода врага кнопки затемняются и не нажимаются
+        this.actionButtons.forEach((button) => {
+            if (isEnabled) {
+                button.setAlpha(1)
+                button.setInteractive()
+            } else {
+                button.setAlpha(0.45)
+                button.disableInteractive()
+            }
+        })
     }
 
     showDamage(x, y, damage) {

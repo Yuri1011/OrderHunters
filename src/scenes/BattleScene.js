@@ -29,8 +29,20 @@ export class BattleScene extends Phaser.Scene {
         // Заглушка "тролль"
         this.troll = this.add.rectangle(900, 400, 120, 160, 0xaa0000)
 
+        // контейнеры для баров
+        this.hunterHPBar = this.add.graphics()
+        this.trollHPBar = this.add.graphics()
+
+        // здоровье персонажей
         this.hunterHP = 100
         this.trollHP = 150
+
+        // максимальное HP
+        this.hunterMaxHP = this.hunterHP
+        this.trollMaxHP = this.trollHP
+
+        // первый рендер
+        this.drawHPBars()
 
         this.hunterHPText = this.add.text(250, 500, 'HP: 100', {
             fontSize: '20px',
@@ -92,10 +104,13 @@ export class BattleScene extends Phaser.Scene {
 
         const damage = Phaser.Math.Between(20, 40)
         this.trollHP -= damage
+        this.trollHP = Math.max(this.trollHP, 0)
 
         this.trollHPText.setText('HP: ' + Math.max(this.trollHP, 0))
 
         this.showDamage(this.troll.x, this.troll.y - 100, damage)
+
+        this.drawHPBars()
 
         this.tweens.add({
             targets: this.hunter,
@@ -128,10 +143,13 @@ export class BattleScene extends Phaser.Scene {
 
         const damage = Phaser.Math.Between(10, 25)
         this.trollHP -= damage
+        this.trollHP = Math.max(this.trollHP, 0)
 
         this.trollHPText.setText('HP: ' + Math.max(this.trollHP, 0))
 
         this.showDamage(this.troll.x, this.troll.y - 100, damage)
+
+        this.drawHPBars()
 
         this.tweens.add({
             targets: this.hunter,
@@ -171,10 +189,13 @@ export class BattleScene extends Phaser.Scene {
         }
 
         this.hunterHP -= damage
+        this.hunterHP = Math.max(this.hunterHP, 0)
 
         this.hunterHPText.setText('HP: ' + Math.max(this.hunterHP, 0))
 
         this.showDamage(this.hunter.x, this.hunter.y - 100, damage)
+
+        this.drawHPBars()
 
         this.tweens.add({
             targets: this.troll,
@@ -211,5 +232,31 @@ export class BattleScene extends Phaser.Scene {
             duration: 600,
             onComplete: () => text.destroy()
         })
+    }
+
+    drawHPBars() {
+        this.hunterHPBar.clear()
+        this.trollHPBar.clear()
+
+        const barWidth = 200
+        const barHeight = 20
+
+        // --- ОХОТНИК ---
+        const hunterRatio = Math.max(this.hunterHP, 0) / this.hunterMaxHP
+
+        this.hunterHPBar.fillStyle(0x222222)
+        this.hunterHPBar.fillRect(200, 550, barWidth, barHeight)
+
+        this.hunterHPBar.fillStyle(0x00ff00)
+        this.hunterHPBar.fillRect(200, 550, barWidth * hunterRatio, barHeight)
+
+        // --- ТРОЛЛЬ ---
+        const trollRatio = Math.max(this.trollHP, 0) / this.trollMaxHP
+
+        this.trollHPBar.fillStyle(0x222222)
+        this.trollHPBar.fillRect(800, 550, barWidth, barHeight)
+
+        this.trollHPBar.fillStyle(0xff0000)
+        this.trollHPBar.fillRect(800, 550, barWidth * trollRatio, barHeight)
     }
 }

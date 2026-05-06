@@ -51,17 +51,52 @@ export class BattleScene extends Phaser.Scene {
         this.hunterMaxHP = this.hunterHP
         this.trollMaxHP = this.trollHP
 
+        // Нижняя боевая панель
+        this.uiPanel = this.add.graphics().setDepth(8)
+
+        this.uiPanel.fillStyle(0x000000, 0.65)
+        this.uiPanel.fillRoundedRect(130, 550, 1020, 145, 18)
+
+        this.uiPanel.lineStyle(2, 0x555555, 0.8)
+        this.uiPanel.strokeRoundedRect(130, 550, 1020, 145, 18)
+
+        // Текст состояния боя
+        this.statusText = this.add.text(540, 565, 'Ход охотника', {
+            fontSize: '22px',
+            color: '#ffffff'
+        }).setDepth(10)
+
+        // Боевой журнал: храним последние сообщения боя
+        this.battleLog = []
+
+        this.battleLogTexts = [
+            this.add.text(460, 592, '', {
+                fontSize: '14px',
+                color: '#cccccc'
+            }).setDepth(10),
+
+            this.add.text(460, 610, '', {
+                fontSize: '14px',
+                color: '#cccccc'
+            }).setDepth(10),
+
+            this.add.text(460, 628, '', {
+                fontSize: '14px',
+                color: '#cccccc'
+            }).setDepth(10)
+        ]
+
         // Графика для HP-полосок
         this.hunterHPBar = this.add.graphics().setDepth(10)
         this.trollHPBar = this.add.graphics().setDepth(10)
 
         // Текст HP
-        this.hunterHPText = this.add.text(230, 585, 'HP: 100', {
+        this.hunterHPText = this.add.text(190, 585, 'Охотник HP: 100', {
             fontSize: '20px',
             color: '#00ff00'
         }).setDepth(10)
 
-        this.trollHPText = this.add.text(830, 585, 'HP: 150', {
+        this.trollHPText = this.add.text(870, 585, 'Тролль HP: 150', {
             fontSize: '20px',
             color: '#ff0000'
         }).setDepth(10)
@@ -70,7 +105,7 @@ export class BattleScene extends Phaser.Scene {
         this.drawHPBars()
 
         // Кнопка: удар
-        const attackText = this.add.text(420, 655, 'УДАР', {
+        const attackText = this.add.text(470, 650, 'УДАР', {
             fontSize: '24px',
             backgroundColor: '#333333',
             color: '#ffffff',
@@ -85,7 +120,7 @@ export class BattleScene extends Phaser.Scene {
         })
 
         // Кнопка: защита
-        const defendText = this.add.text(570, 655, 'ЗАЩИТА', {
+        const defendText = this.add.text(600, 650, 'ЗАЩИТА', {
             fontSize: '24px',
             backgroundColor: '#333333',
             color: '#ffffff',
@@ -100,7 +135,7 @@ export class BattleScene extends Phaser.Scene {
         })
 
         // Кнопка: навык
-        const skillText = this.add.text(760, 655, 'НАВЫК', {
+        const skillText = this.add.text(770, 650, 'НАВЫК', {
             fontSize: '24px',
             backgroundColor: '#333333',
             color: '#ffffff',
@@ -116,6 +151,8 @@ export class BattleScene extends Phaser.Scene {
 
         // Сохраняем кнопки, чтобы отключать их во время хода врага
         this.actionButtons = [attackText, defendText, skillText]
+
+        this.addBattleLog('Бой начался')
     }
 
     attack() {
@@ -123,13 +160,15 @@ export class BattleScene extends Phaser.Scene {
         if (this.trollHP <= 0) return
 
         this.setActionButtonsEnabled(false)
+        this.setStatus('Охотник атакует')
 
         const damage = Phaser.Math.Between(10, 25)
 
         this.trollHP -= damage
         this.trollHP = Math.max(this.trollHP, 0)
 
-        this.trollHPText.setText('HP: ' + this.trollHP)
+        this.trollHPText.setText('Тролль HP: ' + this.trollHP)
+        this.addBattleLog('Охотник нанёс ' + damage + ' урона')
         this.showDamage(this.troll.x, this.troll.y - 260, damage)
         this.hitEffect(this.troll)
         this.drawHPBars()
@@ -159,13 +198,15 @@ export class BattleScene extends Phaser.Scene {
         if (this.trollHP <= 0) return
 
         this.setActionButtonsEnabled(false)
+        this.setStatus('Охотник использует навык')
 
         const damage = Phaser.Math.Between(20, 40)
 
         this.trollHP -= damage
         this.trollHP = Math.max(this.trollHP, 0)
 
-        this.trollHPText.setText('HP: ' + this.trollHP)
+        this.trollHPText.setText('Тролль HP: ' + this.trollHP)
+        this.addBattleLog('Навык нанёс ' + damage + ' урона')
         this.showDamage(this.troll.x, this.troll.y - 260, damage)
         this.hitEffect(this.troll)
         this.drawHPBars()
@@ -195,6 +236,8 @@ export class BattleScene extends Phaser.Scene {
         if (this.hunterHP <= 0 || this.trollHP <= 0) return
 
         this.setActionButtonsEnabled(false)
+        this.setStatus('Охотник защищается')
+        this.addBattleLog('Охотник приготовился к защите')
 
         this.isDefending = true
         this.turn = 'enemy'
@@ -208,18 +251,22 @@ export class BattleScene extends Phaser.Scene {
         if (this.hunterHP <= 0) return
         if (this.trollHP <= 0) return
 
+        this.setStatus('Тролль атакует', '#ffaaaa')
+
         let damage = Phaser.Math.Between(5, 20)
 
         // Если игрок выбрал защиту, урон уменьшается в 2 раза
         if (this.isDefending) {
             damage = Math.floor(damage / 2)
             this.isDefending = false
+            this.addBattleLog('Защита снизила урон')
         }
 
         this.hunterHP -= damage
         this.hunterHP = Math.max(this.hunterHP, 0)
 
-        this.hunterHPText.setText('HP: ' + this.hunterHP)
+        this.hunterHPText.setText('Охотник HP: ' + this.hunterHP)
+        this.addBattleLog('Тролль нанёс ' + damage + ' урона')
         this.showDamage(this.hunter.x, this.hunter.y - 260, damage)
         this.hitEffect(this.hunter)
         this.drawHPBars()
@@ -238,6 +285,7 @@ export class BattleScene extends Phaser.Scene {
         }
 
         this.turn = 'player'
+        this.setStatus('Ход охотника')
         this.setActionButtonsEnabled(true)
     }
 
@@ -253,6 +301,9 @@ export class BattleScene extends Phaser.Scene {
             fontSize: '32px',
             color: '#ffffff'
         }).setDepth(20)
+
+        this.setStatus('Победа', '#ffffff')
+        this.addBattleLog('Тролль повержен')
     }
 
     playerDead() {
@@ -266,6 +317,27 @@ export class BattleScene extends Phaser.Scene {
             fontSize: '32px',
             color: '#ff0000'
         }).setDepth(20)
+
+        this.setStatus('Поражение', '#ff3333')
+        this.addBattleLog('Охотник пал в бою')
+    }
+
+    setStatus(text, color = '#ffffff') {
+        this.statusText.setText(text)
+        this.statusText.setColor(color)
+    }
+
+    addBattleLog(message) {
+        // Добавляем новое сообщение в начало журнала
+        this.battleLog.unshift(message)
+
+        // Храним только последние 3 сообщения
+        this.battleLog = this.battleLog.slice(0, 3)
+
+        // Обновляем строки журнала на экране
+        this.battleLogTexts.forEach((textObject, index) => {
+            textObject.setText(this.battleLog[index] || '')
+        })
     }
 
     hitEffect(target) {
@@ -327,18 +399,18 @@ export class BattleScene extends Phaser.Scene {
         const hunterRatio = Math.max(this.hunterHP, 0) / this.hunterMaxHP
 
         this.hunterHPBar.fillStyle(0x222222)
-        this.hunterHPBar.fillRect(200, 615, barWidth, barHeight)
+        this.hunterHPBar.fillRect(190, 620, barWidth, barHeight)
 
         this.hunterHPBar.fillStyle(0x00ff00)
-        this.hunterHPBar.fillRect(200, 615, barWidth * hunterRatio, barHeight)
+        this.hunterHPBar.fillRect(190, 620, barWidth * hunterRatio, barHeight)
 
         // --- ТРОЛЛЬ ---
         const trollRatio = Math.max(this.trollHP, 0) / this.trollMaxHP
 
         this.trollHPBar.fillStyle(0x222222)
-        this.trollHPBar.fillRect(800, 615, barWidth, barHeight)
+        this.trollHPBar.fillRect(870, 620, barWidth, barHeight)
 
         this.trollHPBar.fillStyle(0xff0000)
-        this.trollHPBar.fillRect(800, 615, barWidth * trollRatio, barHeight)
+        this.trollHPBar.fillRect(870, 620, barWidth * trollRatio, barHeight)
     }
 }

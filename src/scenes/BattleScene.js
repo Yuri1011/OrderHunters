@@ -1,10 +1,18 @@
 import Phaser from 'phaser'
 import { combatants } from '../data/combatants.js'
+import { getContractById, contracts } from '../data/contracts.js'
 import { skills } from '../data/skills.js'
 
 export class BattleScene extends Phaser.Scene {
     constructor() {
         super('BattleScene')
+    }
+
+    init(data = {}) {
+        this.contract = getContractById(data.contractId) || contracts[0]
+
+        // Бонус, который может прийти из сцены пути
+        this.firstStrikeBonus = data.firstStrikeBonus || 0
     }
 
     preload() {
@@ -20,7 +28,7 @@ export class BattleScene extends Phaser.Scene {
 
         // Данные бойцов теперь берём из отдельных файлов
         this.hunterData = combatants.hunter
-        this.trollData = combatants.troll
+        this.enemyData = combatants[this.contract.enemyId]
 
         // Фон сцены
         this.cameras.main.setBackgroundColor('#1a1a1a')
@@ -51,7 +59,7 @@ export class BattleScene extends Phaser.Scene {
 
         // Здоровье персонажей
         this.hunterHP = this.hunterData.maxHP
-        this.trollHP = this.trollData.maxHP
+        this.trollHP = this.enemyData.maxHP
 
         // Максимальное здоровье нужно для расчёта HP-полосок
         this.hunterMaxHP = this.hunterHP
@@ -102,7 +110,7 @@ export class BattleScene extends Phaser.Scene {
             color: '#00ff00'
         }).setDepth(10)
 
-        this.trollHPText = this.add.text(870, 585, 'Тролль HP: 150', {
+        this.trollHPText = this.add.text(870, 585, this.enemyData.name + ' HP: ' + this.trollHP, {
             fontSize: '20px',
             color: '#ff0000'
         }).setDepth(10)
@@ -168,15 +176,21 @@ export class BattleScene extends Phaser.Scene {
         this.setActionButtonsEnabled(false)
         this.setStatus('Охотник атакует')
 
-        const damage = Phaser.Math.Between(
+        let damage = Phaser.Math.Between(
             skills.hunterAttack.minDamage,
             skills.hunterAttack.maxDamage
         )
 
+        if (this.firstStrikeBonus > 0) {
+            damage += this.firstStrikeBonus
+            this.addBattleLog('Следы помогли выбрать слабое место: +' + this.firstStrikeBonus)
+            this.firstStrikeBonus = 0
+        }
+
         this.trollHP -= damage
         this.trollHP = Math.max(this.trollHP, 0)
 
-        this.trollHPText.setText('Тролль HP: ' + this.trollHP)
+        this.trollHPText.setText(this.enemyData.name + ' HP: ' + this.trollHP)
         this.addBattleLog(skills.hunterAttack.logText + ' ' + damage + ' урона')
         this.showDamage(this.troll.x, this.troll.y - 260, damage)
         this.hitEffect(this.troll)
@@ -217,7 +231,7 @@ export class BattleScene extends Phaser.Scene {
         this.trollHP -= damage
         this.trollHP = Math.max(this.trollHP, 0)
 
-        this.trollHPText.setText('Тролль HP: ' + this.trollHP)
+        this.trollHPText.setText(this.enemyData.name + ' HP: ' + this.trollHP)
         this.addBattleLog(skills.hunterSkill.logText + ' ' + damage + ' урона')
         this.showDamage(this.troll.x, this.troll.y - 260, damage)
         this.hitEffect(this.troll)
@@ -323,8 +337,12 @@ export class BattleScene extends Phaser.Scene {
         this.time.delayedCall(1500, () => {
             this.scene.start('ContractResultScene', {
                 result: 'victory',
-                silver: Phaser.Math.Between(45, 80),
-                exp: 20
+                contractId: this.contract.id,
+                silver: Phaser.Math.Between(
+                    this.contract.reward.silverMin,
+                    this.contract.reward.silverMax
+                ),
+                exp: this.contract.reward.exp
             })
         })
     }
@@ -347,8 +365,9 @@ export class BattleScene extends Phaser.Scene {
         this.time.delayedCall(1500, () => {
             this.scene.start('ContractResultScene', {
                 result: 'defeat',
+                contractId: this.contract.id,
                 silver: 0,
-                exp: 5
+                exp: this.contract.reward.defeatExp
             })
         })
     }

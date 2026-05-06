@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { getContractById, contracts } from '../data/contracts.js'
 import { playerState } from '../data/playerState.js'
 
 export class ContractResultScene extends Phaser.Scene {
@@ -6,7 +7,8 @@ export class ContractResultScene extends Phaser.Scene {
         super('ContractResultScene')
     }
 
-    init(data) {
+    init(data = {}) {
+        this.contract = getContractById(data.contractId) || contracts[0]
         this.result = data.result || 'victory'
         this.silver = data.silver || 0
         this.exp = data.exp || 0

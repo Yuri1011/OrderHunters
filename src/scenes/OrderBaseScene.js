@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { contracts } from '../data/contracts.js'
 import { playerState } from '../data/playerState.js'
 
 export class OrderBaseScene extends Phaser.Scene {
@@ -7,6 +8,8 @@ export class OrderBaseScene extends Phaser.Scene {
     }
 
     create() {
+        const contract = contracts[0]
+
         this.cameras.main.setBackgroundColor('#080808')
 
         // Тёмный фон с лёгкими слоями
@@ -107,23 +110,23 @@ export class OrderBaseScene extends Phaser.Scene {
             color: '#999999'
         }).setDepth(3)
 
-        this.add.text(470, 310, 'Тролль на старой дороге', {
+        this.add.text(470, 310, contract.title, {
             fontSize: '28px',
             color: '#ffffff'
         }).setDepth(3)
 
-        this.add.text(470, 360, 'Старая дорога у Темноводья стала опасной.\nКараваны пропадают, следы ведут к лесной чаще.\nМестные говорят о тяжёлых шагах в тумане.', {
+        this.add.text(470, 360, contract.description.join('\n'), {
             fontSize: '17px',
             color: '#c7c7c7',
             lineSpacing: 8
         }).setDepth(3)
 
-        this.add.text(470, 465, 'Опасность: высокая', {
+        this.add.text(470, 465, 'Опасность: ' + contract.danger, {
             fontSize: '16px',
-            color: '#ff7777'
+            color: contract.dangerColor
         }).setDepth(3)
 
-        this.add.text(470, 495, 'Награда: серебро, опыт, возможная добыча', {
+        this.add.text(470, 495, 'Награда: ' + contract.reward.silverMin + '-' + contract.reward.silverMax + ' серебра, опыт', {
             fontSize: '16px',
             color: '#d0d0d0'
         }).setDepth(3)
@@ -152,7 +155,9 @@ export class OrderBaseScene extends Phaser.Scene {
         })
 
         startButton.on('pointerdown', () => {
-            this.scene.start('BattleScene')
+            this.scene.start('ContractTravelScene', {
+                contractId: contract.id
+            })
         })
 
         // Нижняя подпись

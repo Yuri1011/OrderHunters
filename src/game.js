@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { OrderBaseScene } from './scenes/OrderBaseScene'
+import { ContractTravelScene } from './scenes/ContractTravelScene'
 import { BattleScene } from './scenes/BattleScene'
 import { ContractResultScene } from './scenes/ContractResultScene'
 
@@ -16,7 +17,7 @@ export function createGame() {
         },
 
         backgroundColor: '#000000',
-        scene: [OrderBaseScene, BattleScene, ContractResultScene]
+        scene: [OrderBaseScene, ContractTravelScene, BattleScene, ContractResultScene]
     }
 
     new Phaser.Game(config)

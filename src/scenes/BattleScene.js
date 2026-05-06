@@ -1,4 +1,6 @@
 import Phaser from 'phaser'
+import { combatants } from '../data/combatants.js'
+import { skills } from '../data/skills.js'
 
 export class BattleScene extends Phaser.Scene {
     constructor() {
@@ -15,6 +17,10 @@ export class BattleScene extends Phaser.Scene {
     create() {
         this.turn = 'player' // player | enemy
         this.isDefending = false
+
+        // Данные бойцов теперь берём из отдельных файлов
+        this.hunterData = combatants.hunter
+        this.trollData = combatants.troll
 
         // Фон сцены
         this.cameras.main.setBackgroundColor('#1a1a1a')
@@ -44,8 +50,8 @@ export class BattleScene extends Phaser.Scene {
             .setDepth(2)
 
         // Здоровье персонажей
-        this.hunterHP = 100
-        this.trollHP = 150
+        this.hunterHP = this.hunterData.maxHP
+        this.trollHP = this.trollData.maxHP
 
         // Максимальное здоровье нужно для расчёта HP-полосок
         this.hunterMaxHP = this.hunterHP
@@ -162,13 +168,16 @@ export class BattleScene extends Phaser.Scene {
         this.setActionButtonsEnabled(false)
         this.setStatus('Охотник атакует')
 
-        const damage = Phaser.Math.Between(10, 25)
+        const damage = Phaser.Math.Between(
+            skills.hunterAttack.minDamage,
+            skills.hunterAttack.maxDamage
+        )
 
         this.trollHP -= damage
         this.trollHP = Math.max(this.trollHP, 0)
 
         this.trollHPText.setText('Тролль HP: ' + this.trollHP)
-        this.addBattleLog('Охотник нанёс ' + damage + ' урона')
+        this.addBattleLog(skills.hunterAttack.logText + ' ' + damage + ' урона')
         this.showDamage(this.troll.x, this.troll.y - 260, damage)
         this.hitEffect(this.troll)
         this.drawHPBars()
@@ -200,13 +209,16 @@ export class BattleScene extends Phaser.Scene {
         this.setActionButtonsEnabled(false)
         this.setStatus('Охотник использует навык')
 
-        const damage = Phaser.Math.Between(20, 40)
+        const damage = Phaser.Math.Between(
+            skills.hunterSkill.minDamage,
+            skills.hunterSkill.maxDamage
+        )
 
         this.trollHP -= damage
         this.trollHP = Math.max(this.trollHP, 0)
 
         this.trollHPText.setText('Тролль HP: ' + this.trollHP)
-        this.addBattleLog('Навык нанёс ' + damage + ' урона')
+        this.addBattleLog(skills.hunterSkill.logText + ' ' + damage + ' урона')
         this.showDamage(this.troll.x, this.troll.y - 260, damage)
         this.hitEffect(this.troll)
         this.drawHPBars()
@@ -253,11 +265,14 @@ export class BattleScene extends Phaser.Scene {
 
         this.setStatus('Тролль атакует', '#ffaaaa')
 
-        let damage = Phaser.Math.Between(5, 20)
+        let damage = Phaser.Math.Between(
+            skills.trollAttack.minDamage,
+            skills.trollAttack.maxDamage
+        )
 
         // Если игрок выбрал защиту, урон уменьшается в 2 раза
         if (this.isDefending) {
-            damage = Math.floor(damage / 2)
+            damage = Math.floor(damage * skills.defend.damageMultiplier)
             this.isDefending = false
             this.addBattleLog('Защита снизила урон')
         }
@@ -266,7 +281,7 @@ export class BattleScene extends Phaser.Scene {
         this.hunterHP = Math.max(this.hunterHP, 0)
 
         this.hunterHPText.setText('Охотник HP: ' + this.hunterHP)
-        this.addBattleLog('Тролль нанёс ' + damage + ' урона')
+        this.addBattleLog(skills.trollAttack.logText + ' ' + damage + ' урона')
         this.showDamage(this.hunter.x, this.hunter.y - 260, damage)
         this.hitEffect(this.hunter)
         this.drawHPBars()

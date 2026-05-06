@@ -8,6 +8,7 @@ export class ContractTravelScene extends Phaser.Scene {
 
     init(data) {
         this.contract = getContractById(data.contractId) || contracts[0]
+        this.travelEvent = this.contract.travelEvent
     }
 
     create() {
@@ -28,81 +29,66 @@ export class ContractTravelScene extends Phaser.Scene {
             color: '#cccccc'
         })
 
-        // Текст события
-        this.add.text(170, 230,
-            'Старая дорога тонет в сыром тумане.\n' +
-            'На влажной земле видны глубокие следы.\n' +
-            'Кто-то тяжёлый прошёл здесь совсем недавно.',
-            {
-                fontSize: '22px',
-                color: '#dddddd',
-                lineSpacing: 10,
-                wordWrap: {
-                    width: 850
-                }
-            }
-        )
-
-        this.add.text(170, 390, 'Что сделать?', {
+        // Название события пути
+        this.add.text(170, 205, this.travelEvent.title, {
             fontSize: '26px',
             color: '#ffffff'
         })
 
-        // Кнопка: осмотреть следы
-        const inspectButton = this.add.text(170, 455, 'ОСМОТРЕТЬ СЛЕДЫ', {
+        // Описание события пути
+        this.add.text(170, 255, this.travelEvent.text.join('\n'), {
             fontSize: '22px',
-            backgroundColor: '#333333',
-            color: '#ffffff',
-            padding: {
-                x: 18,
-                y: 10
+            color: '#dddddd',
+            lineSpacing: 10,
+            wordWrap: {
+                width: 850
             }
-        }).setInteractive()
-
-        inspectButton.on('pointerover', () => {
-            inspectButton.setStyle({ backgroundColor: '#555555' })
         })
 
-        inspectButton.on('pointerout', () => {
-            inspectButton.setStyle({ backgroundColor: '#333333' })
+        this.add.text(170, 410, 'Что сделать?', {
+            fontSize: '26px',
+            color: '#ffffff'
         })
 
-        inspectButton.on('pointerdown', () => {
-            this.scene.start('BattleScene', {
-                contractId: this.contract.id,
+        // Рисуем варианты выбора из данных контракта
+        this.travelEvent.choices.forEach((choice, index) => {
+            const x = 170 + index * 300
+            const y = 475
 
-                // Бонус за внимательность: первый удар будет сильнее
-                firstStrikeBonus: 10
+            const choiceButton = this.add.text(x, y, choice.text, {
+                fontSize: '22px',
+                backgroundColor: '#333333',
+                color: '#ffffff',
+                padding: {
+                    x: 18,
+                    y: 10
+                }
+            }).setInteractive()
+
+            choiceButton.on('pointerover', () => {
+                choiceButton.setStyle({
+                    backgroundColor: '#555555'
+                })
+            })
+
+            choiceButton.on('pointerout', () => {
+                choiceButton.setStyle({
+                    backgroundColor: '#333333'
+                })
+            })
+
+            choiceButton.on('pointerdown', () => {
+                this.scene.start('BattleScene', {
+                    contractId: this.contract.id,
+
+                    // Бонусы выбора передаются в бой
+                    firstStrikeBonus: choice.firstStrikeBonus || 0,
+                    travelBattleLog: choice.battleLog || ''
+                })
             })
         })
 
-        // Кнопка: идти дальше
-        const continueButton = this.add.text(470, 455, 'ИДТИ ДАЛЬШЕ', {
-            fontSize: '22px',
-            backgroundColor: '#333333',
-            color: '#ffffff',
-            padding: {
-                x: 18,
-                y: 10
-            }
-        }).setInteractive()
-
-        continueButton.on('pointerover', () => {
-            continueButton.setStyle({ backgroundColor: '#555555' })
-        })
-
-        continueButton.on('pointerout', () => {
-            continueButton.setStyle({ backgroundColor: '#333333' })
-        })
-
-        continueButton.on('pointerdown', () => {
-            this.scene.start('BattleScene', {
-                contractId: this.contract.id,
-                firstStrikeBonus: 0
-            })
-        })
-
-        this.add.text(170, 565, 'Осмотр следов может дать преимущество перед боем.', {
+        this.add.text(170, 585, this.travelEvent.hint, {
             fontSize: '16px',
             color: '#888888'
         })

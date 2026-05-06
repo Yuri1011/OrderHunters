@@ -11,8 +11,9 @@ export class BattleScene extends Phaser.Scene {
     init(data = {}) {
         this.contract = getContractById(data.contractId) || contracts[0]
 
-        // Бонус, который может прийти из сцены пути
+        // Бонусы, которые приходят из сцены пути
         this.firstStrikeBonus = data.firstStrikeBonus || 0
+        this.travelBattleLog = data.travelBattleLog || ''
     }
 
     preload() {
@@ -183,7 +184,11 @@ export class BattleScene extends Phaser.Scene {
 
         if (this.firstStrikeBonus > 0) {
             damage += this.firstStrikeBonus
-            this.addBattleLog('Следы помогли выбрать слабое место: +' + this.firstStrikeBonus)
+
+            if (this.travelBattleLog) {
+                this.addBattleLog(this.travelBattleLog + ': +' + this.firstStrikeBonus)
+            }
+
             this.firstStrikeBonus = 0
         }
 

@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import { contracts } from '../data/contracts.js'
 import { playerState } from '../data/playerState.js'
+import { contracts } from '../data/contracts.js'
 
 export class OrderBaseScene extends Phaser.Scene {
     constructor() {
@@ -8,18 +8,17 @@ export class OrderBaseScene extends Phaser.Scene {
     }
 
     create() {
-        const contract = contracts[0]
-
         this.cameras.main.setBackgroundColor('#080808')
 
-        // Тёмный фон с лёгкими слоями
+        // Общий тёмный фон
         this.add.rectangle(640, 360, 1280, 720, 0x0b0b0b).setDepth(0)
 
+        // Основная рамка экрана
         this.add.rectangle(640, 360, 1180, 640, 0x111111)
             .setStrokeStyle(2, 0x2f2f2f)
             .setDepth(1)
 
-        // Верхняя полоса
+        // Верхняя панель
         this.add.rectangle(640, 65, 1180, 80, 0x151515)
             .setStrokeStyle(1, 0x3a3a3a)
             .setDepth(2)
@@ -35,18 +34,52 @@ export class OrderBaseScene extends Phaser.Scene {
         }).setDepth(3)
 
         // Левая панель персонажа
+        this.drawHunterPanel()
+
+        // Центральная область с контрактами
+        this.add.text(440, 140, 'Доступные контракты', {
+            fontSize: '32px',
+            color: '#ffffff'
+        }).setDepth(3)
+
+        this.add.text(440, 180, 'Выбери задание, которое Орден готов доверить охотнику.', {
+            fontSize: '17px',
+            color: '#999999'
+        }).setDepth(3)
+
+        // Рисуем карточки контрактов из массива contracts
+        contracts.forEach((contract, index) => {
+            this.drawContractCard(contract, index)
+        })
+
+        // Нижняя подпись
+        this.add.text(640, 660, 'Контракты берутся из данных игры. Позже здесь появятся регионы, цепочки заданий и последствия выбора.', {
+            fontSize: '14px',
+            color: '#777777',
+            align: 'center',
+            wordWrap: {
+                width: 760
+            }
+        })
+            .setOrigin(0.5, 0)
+            .setDepth(3)
+    }
+
+    drawHunterPanel() {
         const hunterPanel = this.add.graphics().setDepth(2)
+
         hunterPanel.fillStyle(0x151515, 0.95)
         hunterPanel.fillRoundedRect(80, 130, 300, 500, 18)
+
         hunterPanel.lineStyle(2, 0x444444, 1)
         hunterPanel.strokeRoundedRect(80, 130, 300, 500, 18)
 
-        this.add.text(115, 165, 'Рейнар Вельм', {
+        this.add.text(115, 165, playerState.name, {
             fontSize: '26px',
             color: '#ffffff'
         }).setDepth(3)
 
-        this.add.text(115, 205, 'Охотник Ордена', {
+        this.add.text(115, 205, playerState.title, {
             fontSize: '17px',
             color: '#b0b0b0'
         }).setDepth(3)
@@ -76,69 +109,67 @@ export class OrderBaseScene extends Phaser.Scene {
             color: '#cccccc'
         }).setDepth(3)
 
-        this.add.text(115, 430, 'Шип Ордена', {
+        this.add.text(115, 455, 'Шип Ордена', {
             fontSize: '20px',
             color: '#ffffff'
         }).setDepth(3)
 
-        this.add.text(115, 465, 'Редкий знак свободы.\nОрден больше не имеет\nправа удерживать его.', {
+        this.add.text(115, 490, 'Редкий знак свободы.\nОрден больше не имеет\nправа удерживать его.', {
             fontSize: '15px',
             color: '#999999',
             lineSpacing: 7
         }).setDepth(3)
+    }
 
-        // Центральная область
-        this.add.text(440, 140, 'Доступные контракты', {
-            fontSize: '32px',
-            color: '#ffffff'
-        }).setDepth(3)
+    drawContractCard(contract, index) {
+        const x = 430
+        const y = 240 + index * 180
+        const width = 700
+        const height = 155
 
-        this.add.text(440, 180, 'Выбери задание, которое Орден готов доверить охотнику.', {
-            fontSize: '17px',
-            color: '#999999'
-        }).setDepth(3)
-
-        // Карточка контракта
         const contractPanel = this.add.graphics().setDepth(2)
+
         contractPanel.fillStyle(0x191919, 0.96)
-        contractPanel.fillRoundedRect(430, 240, 700, 300, 18)
-        contractPanel.lineStyle(2, 0x666666, 1)
-        contractPanel.strokeRoundedRect(430, 240, 700, 300, 18)
+        contractPanel.fillRoundedRect(x, y, width, height, 16)
 
-        this.add.text(470, 275, 'Контракт', {
-            fontSize: '18px',
-            color: '#999999'
-        }).setDepth(3)
+        contractPanel.lineStyle(2, 0x555555, 1)
+        contractPanel.strokeRoundedRect(x, y, width, height, 16)
 
-        this.add.text(470, 310, contract.title, {
-            fontSize: '28px',
+        this.add.text(x + 30, y + 20, contract.title, {
+            fontSize: '24px',
             color: '#ffffff'
         }).setDepth(3)
 
-        this.add.text(470, 360, contract.description.join('\n'), {
-            fontSize: '17px',
-            color: '#c7c7c7',
-            lineSpacing: 8
+        this.add.text(x + 30, y + 55, 'Регион: ' + contract.region, {
+            fontSize: '15px',
+            color: '#aaaaaa'
         }).setDepth(3)
 
-        this.add.text(470, 465, 'Опасность: ' + contract.danger, {
-            fontSize: '16px',
+        this.add.text(x + 30, y + 80, 'Опасность: ' + contract.danger, {
+            fontSize: '15px',
             color: contract.dangerColor
         }).setDepth(3)
 
-        this.add.text(470, 495, 'Награда: ' + contract.reward.silverMin + '-' + contract.reward.silverMax + ' серебра, опыт', {
-            fontSize: '16px',
-            color: '#d0d0d0'
+        this.add.text(x + 30, y + 105, 'Награда: ' + contract.reward.silverMin + '-' + contract.reward.silverMax + ' серебра, опыт', {
+            fontSize: '15px',
+            color: '#cccccc'
         }).setDepth(3)
 
-        // Кнопка
-        const startButton = this.add.text(710, 570, 'ВЗЯТЬ КОНТРАКТ', {
-            fontSize: '22px',
+        this.add.text(x + 330, y + 55, contract.description[0], {
+            fontSize: '15px',
+            color: '#bbbbbb',
+            wordWrap: {
+                width: 320
+            }
+        }).setDepth(3)
+
+        const startButton = this.add.text(x + 500, y + 105, 'ВЗЯТЬ', {
+            fontSize: '18px',
             backgroundColor: '#333333',
             color: '#ffffff',
             padding: {
-                x: 22,
-                y: 12
+                x: 18,
+                y: 8
             }
         }).setInteractive().setDepth(4)
 
@@ -159,18 +190,5 @@ export class OrderBaseScene extends Phaser.Scene {
                 contractId: contract.id
             })
         })
-
-        // Нижняя подпись
-        this.add.text(640, 625, 'Пока доступен один тестовый контракт.\nПозже здесь появятся цепочки заданий, регионы и последствия выбора.', {
-            fontSize: '14px',
-            color: '#777777',
-            align: 'center',
-            lineSpacing: 6,
-            wordWrap: {
-                width: 620
-            }
-        })
-        .setOrigin(0.5, 0)
-        .setDepth(3)
     }
 }

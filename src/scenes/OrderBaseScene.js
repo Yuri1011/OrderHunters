@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { playerState } from '../data/playerState.js'
 
 export class OrderBaseScene extends Phaser.Scene {
     constructor() {
@@ -52,17 +53,22 @@ export class OrderBaseScene extends Phaser.Scene {
             color: '#ffffff'
         }).setDepth(3)
 
-        this.add.text(115, 305, 'Здоровье: 100 / 100', {
+        this.add.text(115, 305, 'Здоровье: ' + playerState.hp + ' / ' + playerState.maxHP, {
             fontSize: '16px',
             color: '#79ff79'
         }).setDepth(3)
 
-        this.add.text(115, 335, 'Раны: нет', {
+        this.add.text(115, 335, 'Раны: ' + playerState.wounds, {
             fontSize: '16px',
             color: '#cccccc'
         }).setDepth(3)
 
-        this.add.text(115, 365, 'Опыт: 0', {
+        this.add.text(115, 365, 'Опыт: ' + playerState.exp, {
+            fontSize: '16px',
+            color: '#cccccc'
+        }).setDepth(3)
+
+        this.add.text(115, 395, 'Серебро: ' + playerState.silver, {
             fontSize: '16px',
             color: '#cccccc'
         }).setDepth(3)

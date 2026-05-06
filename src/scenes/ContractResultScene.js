@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { playerState } from '../data/playerState.js'
 
 export class ContractResultScene extends Phaser.Scene {
     constructor() {
@@ -9,6 +10,15 @@ export class ContractResultScene extends Phaser.Scene {
         this.result = data.result || 'victory'
         this.silver = data.silver || 0
         this.exp = data.exp || 0
+
+        if (this.result === 'victory') {
+            playerState.silver += this.silver
+            playerState.exp += this.exp
+        } else {
+            playerState.exp += this.exp
+            playerState.hp = Math.max(playerState.hp - 25, 1)
+            playerState.wounds = 'лёгкое ранение'
+        }
     }
 
     create() {

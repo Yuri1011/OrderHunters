@@ -319,6 +319,14 @@ export class BattleScene extends Phaser.Scene {
 
         this.setStatus('Победа', '#ffffff')
         this.addBattleLog('Тролль повержен')
+
+        this.time.delayedCall(1500, () => {
+            this.scene.start('ContractResultScene', {
+                result: 'victory',
+                silver: Phaser.Math.Between(45, 80),
+                exp: 20
+            })
+        })
     }
 
     playerDead() {
@@ -335,6 +343,14 @@ export class BattleScene extends Phaser.Scene {
 
         this.setStatus('Поражение', '#ff3333')
         this.addBattleLog('Охотник пал в бою')
+
+        this.time.delayedCall(1500, () => {
+            this.scene.start('ContractResultScene', {
+                result: 'defeat',
+                silver: 0,
+                exp: 5
+            })
+        })
     }
 
     setStatus(text, color = '#ffffff') {

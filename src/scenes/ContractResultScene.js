@@ -1,14 +1,15 @@
 import Phaser from 'phaser'
 import { getContractById, contracts } from '../data/contracts.js'
-import { playerState } from '../data/playerState.js'
+import { playerState, completeContract } from '../data/playerState.js'
 
 export class ContractResultScene extends Phaser.Scene {
     constructor() {
         super('ContractResultScene')
     }
 
-    init(data = {}) {
+    init(data) {
         this.contract = getContractById(data.contractId) || contracts[0]
+
         this.result = data.result || 'victory'
         this.silver = data.silver || 0
         this.exp = data.exp || 0
@@ -16,8 +17,13 @@ export class ContractResultScene extends Phaser.Scene {
         if (this.result === 'victory') {
             playerState.silver += this.silver
             playerState.exp += this.exp
+
+            // После победы контракт считается выполненным
+            completeContract(this.contract.id)
         } else {
             playerState.exp += this.exp
+
+            // После провала охотник выживает, но получает последствия
             playerState.hp = Math.max(playerState.hp - 25, 1)
             playerState.wounds = 'лёгкое ранение'
         }

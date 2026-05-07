@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { playerState } from '../data/playerState.js'
+import { playerState, isContractCompleted } from '../data/playerState.js'
 import { contracts } from '../data/contracts.js'
 
 export class OrderBaseScene extends Phaser.Scene {
@@ -122,6 +122,8 @@ export class OrderBaseScene extends Phaser.Scene {
     }
 
     drawContractCard(contract, index) {
+        const isCompleted = isContractCompleted(contract.id)
+
         const x = 430
         const y = 240 + index * 180
         const width = 700
@@ -129,7 +131,7 @@ export class OrderBaseScene extends Phaser.Scene {
 
         const contractPanel = this.add.graphics().setDepth(2)
 
-        contractPanel.fillStyle(0x191919, 0.96)
+        contractPanel.fillStyle(isCompleted ? 0x101010 : 0x191919, 0.96)
         contractPanel.fillRoundedRect(x, y, width, height, 16)
 
         contractPanel.lineStyle(2, 0x555555, 1)
@@ -150,6 +152,13 @@ export class OrderBaseScene extends Phaser.Scene {
             color: contract.dangerColor
         }).setDepth(3)
 
+        if (isCompleted) {
+            this.add.text(x + 190, y + 80, 'ВЫПОЛНЕН', {
+                fontSize: '15px',
+                color: '#79ff79'
+            }).setDepth(3)
+        }
+
         this.add.text(x + 30, y + 105, 'Награда: ' + contract.reward.silverMin + '-' + contract.reward.silverMax + ' серебра, опыт', {
             fontSize: '15px',
             color: '#cccccc'
@@ -163,32 +172,36 @@ export class OrderBaseScene extends Phaser.Scene {
             }
         }).setDepth(3)
 
-        const startButton = this.add.text(x + 500, y + 105, 'ВЗЯТЬ', {
+        const startButton = this.add.text(x + 500, y + 105, isCompleted ? 'ВЫПОЛНЕН' : 'ВЗЯТЬ', {
             fontSize: '18px',
-            backgroundColor: '#333333',
-            color: '#ffffff',
+            backgroundColor: isCompleted ? '#222222' : '#333333',
+            color: isCompleted ? '#777777' : '#ffffff',
             padding: {
                 x: 18,
                 y: 8
             }
-        }).setInteractive().setDepth(4)
+        }).setDepth(4)
 
-        startButton.on('pointerover', () => {
-            startButton.setStyle({
-                backgroundColor: '#555555'
-            })
-        })
+        if (!isCompleted) {
+            startButton.setInteractive()
 
-        startButton.on('pointerout', () => {
-            startButton.setStyle({
-                backgroundColor: '#333333'
+            startButton.on('pointerover', () => {
+                startButton.setStyle({
+                    backgroundColor: '#555555'
+                })
             })
-        })
 
-        startButton.on('pointerdown', () => {
-            this.scene.start('ContractTravelScene', {
-                contractId: contract.id
+            startButton.on('pointerout', () => {
+                startButton.setStyle({
+                    backgroundColor: '#333333'
+                })
             })
-        })
+
+            startButton.on('pointerdown', () => {
+                this.scene.start('ContractTravelScene', {
+                    contractId: contract.id
+                })
+            })
+        }
     }
 }

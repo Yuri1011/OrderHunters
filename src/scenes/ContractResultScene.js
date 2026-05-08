@@ -21,16 +21,25 @@ export class ContractResultScene extends Phaser.Scene {
             playerState.silver += this.silver
             playerState.exp += this.exp
 
-            // После победы сохраняем фактическое HP после боя
+            // Сохраняем фактическое HP после боя
             playerState.hp = Math.max(this.remainingHP, 1)
+
+            // Ранения зависят от того, насколько тяжёлой была победа
+            if (playerState.hp > 50) {
+                playerState.wounds = 'нет'
+            } else if (playerState.hp > 25) {
+                playerState.wounds = 'ушибы'
+            } else {
+                playerState.wounds = 'лёгкое ранение'
+            }
 
             completeContract(this.contract.id)
         } else {
             playerState.exp += this.exp
 
-            // После поражения охотник выживает, но получает последствия
+            // После поражения охотник выживает, но получает тяжёлые последствия
             playerState.hp = 1
-            playerState.wounds = 'лёгкое ранение'
+            playerState.wounds = 'тяжёлое ранение'
         }
     }
 
@@ -71,6 +80,16 @@ export class ContractResultScene extends Phaser.Scene {
         this.add.text(430, 420, 'Опыт: ' + this.exp, {
             fontSize: '22px',
             color: '#dddddd'
+        })
+
+        this.add.text(430, 465, 'Состояние: ' + playerState.hp + ' / ' + playerState.maxHP, {
+            fontSize: '22px',
+            color: '#dddddd'
+        })
+
+        this.add.text(430, 505, 'Раны: ' + playerState.wounds, {
+            fontSize: '22px',
+            color: playerState.wounds === 'нет' ? '#79ff79' : '#ffaa55'
         })
 
         const backButton = this.add.text(470, 540, 'ВЕРНУТЬСЯ В ОРДЕН', {

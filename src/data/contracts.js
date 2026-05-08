@@ -62,7 +62,7 @@ export const contracts = [
 
         // Пока используем того же врага технически.
         // Позже заменим на отдельного монстра.
-        enemyId: 'troll',
+        enemyId: 'millBeast',
 
         reward: {
             silverMin: 30,

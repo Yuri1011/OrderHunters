@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { combatants } from '../data/combatants.js'
 import { getContractById, contracts } from '../data/contracts.js'
-import { playerState } from '../data/playerState.js'
+import { playerState, getEffectiveMaxHP } from '../data/playerState.js'
 import { skills } from '../data/skills.js'
 
 export class BattleScene extends Phaser.Scene {
@@ -27,6 +27,9 @@ export class BattleScene extends Phaser.Scene {
     create() {
         this.turn = 'player' // player | enemy
         this.isDefending = false
+        this.activeEffects = {
+            bleed: null
+        }
 
         // Данные бойцов теперь берём из отдельных файлов
         this.hunterData = combatants.hunter
@@ -41,7 +44,7 @@ export class BattleScene extends Phaser.Scene {
             .setDepth(0)
 
         // Заголовок
-        this.add.text(420, 35, 'Охотник vs Тролль', {
+        this.add.text(420, 35, this.hunterData.name + ' vs ' + this.enemyData.name, {
             fontSize: '32px',
             color: '#ffffff'
         }).setDepth(10)
@@ -54,14 +57,17 @@ export class BattleScene extends Phaser.Scene {
             .setDepth(2)
 
         // Тролль
-        this.troll = this.add.image(950, 600, 'troll')
+        this.troll = this.add.image(950, 600, this.enemyData.assetKey)
             .setOrigin(0.5, 1)
             .setScale(0.30)
             .setDepth(2)
 
-        // Охотник начинает бой с тем HP, которое есть на базе
-        this.hunterHP = playerState.hp
-        this.hunterMaxHP = playerState.maxHP
+        // Максимальное HP охотника зависит от ранений
+        this.hunterMaxHP = getEffectiveMaxHP()
+
+        // Охотник начинает бой с тем HP, которое есть на базе,
+        // но не выше текущего боевого максимума
+        this.hunterHP = Math.min(playerState.hp, this.hunterMaxHP)
 
         // Враг всегда начинает бой с полным HP
         this.trollHP = this.enemyData.maxHP
@@ -279,16 +285,91 @@ export class BattleScene extends Phaser.Scene {
         })
     }
 
+    getEnemyAttack() {
+        const specialAttack = this.enemyData.specialAttack
+
+        // Если у врага есть особая атака — бросаем шанс
+        if (specialAttack) {
+            const roll = Phaser.Math.Between(1, 100)
+
+            if (roll <= specialAttack.chance) {
+                return {
+                    name: specialAttack.name,
+                    damage: Phaser.Math.Between(
+                        specialAttack.damageMin,
+                        specialAttack.damageMax
+                    ),
+                    logText: specialAttack.logText,
+                    isSpecial: true,
+                    effect: specialAttack.effect || null
+                }
+            }
+        }
+
+        // Обычная атака врага
+        return {
+            name: 'Обычная атака',
+            damage: Phaser.Math.Between(
+                this.enemyData.damageMin,
+                this.enemyData.damageMax
+            ),
+            logText: this.enemyData.name + ' нанёс',
+            isSpecial: false
+        }
+    }
+
+    applyEffect(effect) {
+        if (!effect) return
+
+        if (effect.type === 'bleed') {
+            this.activeEffects.bleed = {
+                turns: effect.turns,
+                damage: effect.damage
+            }
+
+            this.addBattleLog('Охотник истекает кровью')
+            this.setStatus('Кровотечение', '#ff5555')
+        }
+    }
+
+    processPlayerTurnEffects() {
+        const bleed = this.activeEffects.bleed
+
+        if (!bleed) return
+
+        this.hunterHP -= bleed.damage
+        this.hunterHP = Math.max(this.hunterHP, 0)
+
+        bleed.turns -= 1
+
+        this.hunterHPText.setText('Охотник HP: ' + this.hunterHP)
+        this.showDamage(this.hunter.x, this.hunter.y - 260, bleed.damage)
+        this.drawHPBars()
+
+        this.addBattleLog('Кровотечение: ' + bleed.damage + ' урона')
+
+        if (bleed.turns <= 0) {
+            this.activeEffects.bleed = null
+            this.addBattleLog('Кровотечение остановилось')
+        }
+
+        if (this.hunterHP <= 0) {
+            this.playerDead()
+        }
+    }
+
     enemyAttack() {
         if (this.hunterHP <= 0) return
         if (this.trollHP <= 0) return
 
-        this.setStatus('Тролль атакует', '#ffaaaa')
+        this.setStatus(this.enemyData.name + ' атакует', '#ffaaaa')
 
-        let damage = Phaser.Math.Between(
-            skills.trollAttack.minDamage,
-            skills.trollAttack.maxDamage
-        )
+        const enemyAttack = this.getEnemyAttack()
+        let damage = enemyAttack.damage
+
+        if (enemyAttack.isSpecial) {
+            this.setStatus(enemyAttack.name, '#ff7777')
+        }
 
         // Если игрок выбрал защиту, урон уменьшается в 2 раза
         if (this.isDefending) {
@@ -301,7 +382,17 @@ export class BattleScene extends Phaser.Scene {
         this.hunterHP = Math.max(this.hunterHP, 0)
 
         this.hunterHPText.setText('Охотник HP: ' + this.hunterHP)
-        this.addBattleLog(skills.trollAttack.logText + ' ' + damage + ' урона')
+
+        if (enemyAttack.isSpecial) {
+            this.addBattleLog(enemyAttack.logText + ': ' + damage + ' урона')
+        } else {
+            this.addBattleLog(enemyAttack.logText + ' ' + damage + ' урона')
+        }
+
+        if (enemyAttack.effect && this.hunterHP > 0) {
+            this.applyEffect(enemyAttack.effect)
+        }
+
         this.showDamage(this.hunter.x, this.hunter.y - 260, damage)
         this.hitEffect(this.hunter)
         this.drawHPBars()
@@ -320,6 +411,12 @@ export class BattleScene extends Phaser.Scene {
         }
 
         this.turn = 'player'
+
+        // Эффекты состояния срабатывают в начале хода охотника
+        this.processPlayerTurnEffects()
+
+        if (this.hunterHP <= 0) return
+
         this.setStatus('Ход охотника')
         this.setActionButtonsEnabled(true)
     }
@@ -332,13 +429,13 @@ export class BattleScene extends Phaser.Scene {
         this.troll.setTint(0x555555)
         this.troll.setAlpha(0.75)
 
-        this.add.text(500, 300, 'Тролль повержен', {
+        this.add.text(500, 300, this.enemyData.name + ' повержен', {
             fontSize: '32px',
             color: '#ffffff'
         }).setDepth(20)
 
         this.setStatus('Победа', '#ffffff')
-        this.addBattleLog('Тролль повержен')
+        this.addBattleLog(this.enemyData.name + ' повержен')
 
         this.time.delayedCall(1500, () => {
             this.scene.start('ContractResultScene', {

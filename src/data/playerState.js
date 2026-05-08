@@ -16,6 +16,29 @@ export const playerState = {
     completedContracts: []
 }
 
+// Штрафы от ранений
+export const woundEffects = {
+    'нет': {
+        maxHPPenalty: 0,
+        canTakeContract: true
+    },
+
+    'ушибы': {
+        maxHPPenalty: 10,
+        canTakeContract: true
+    },
+
+    'лёгкое ранение': {
+        maxHPPenalty: 20,
+        canTakeContract: true
+    },
+
+    'тяжёлое ранение': {
+        maxHPPenalty: 40,
+        canTakeContract: false
+    }
+}
+
 export function completeContract(contractId) {
     // Не добавляем один и тот же контракт дважды
     if (!playerState.completedContracts.includes(contractId)) {
@@ -25,6 +48,22 @@ export function completeContract(contractId) {
 
 export function isContractCompleted(contractId) {
     return playerState.completedContracts.includes(contractId)
+}
+
+export function getCurrentWoundEffect() {
+    return woundEffects[playerState.wounds] || woundEffects['нет']
+}
+
+export function getEffectiveMaxHP() {
+    const effect = getCurrentWoundEffect()
+
+    return Math.max(playerState.maxHP - effect.maxHPPenalty, 1)
+}
+
+export function canTakeContract() {
+    const effect = getCurrentWoundEffect()
+
+    return effect.canTakeContract
 }
 
 export function needsRest() {

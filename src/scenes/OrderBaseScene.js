@@ -1,5 +1,12 @@
 import Phaser from 'phaser'
-import { playerState, isContractCompleted, restAtBase, REST_COST } from '../data/playerState.js'
+import {
+    playerState,
+    isContractCompleted,
+    restAtBase,
+    REST_COST,
+    canTakeContract,
+    getEffectiveMaxHP
+} from '../data/playerState.js'
 import { contracts } from '../data/contracts.js'
 
 export class OrderBaseScene extends Phaser.Scene {
@@ -89,7 +96,7 @@ export class OrderBaseScene extends Phaser.Scene {
             color: '#ffffff'
         }).setDepth(3)
 
-        this.add.text(115, 305, 'Здоровье: ' + playerState.hp + ' / ' + playerState.maxHP, {
+        this.add.text(115, 305, 'Здоровье: ' + playerState.hp + ' / ' + getEffectiveMaxHP(), {
             fontSize: '16px',
             color: '#79ff79'
         }).setDepth(3)
@@ -172,6 +179,7 @@ export class OrderBaseScene extends Phaser.Scene {
 
     drawContractCard(contract, index) {
         const isCompleted = isContractCompleted(contract.id)
+        const canStart = canTakeContract()
 
         const x = 430
         const y = 240 + index * 180
@@ -221,17 +229,32 @@ export class OrderBaseScene extends Phaser.Scene {
             }
         }).setDepth(3)
 
-        const startButton = this.add.text(x + 500, y + 105, isCompleted ? 'ВЫПОЛНЕН' : 'ВЗЯТЬ', {
+        let buttonText = 'ВЗЯТЬ'
+        let buttonColor = '#333333'
+        let textColor = '#ffffff'
+
+        if (isCompleted) {
+            buttonText = 'ВЫПОЛНЕН'
+            buttonColor = '#222222'
+            textColor = '#777777'
+        } else if (!canStart) {
+            buttonText = 'НУЖЕН ОТДЫХ'
+            buttonColor = '#221111'
+            textColor = '#ff7777'
+        }
+
+        const startButton = this.add.text(x + 500, y + 105, buttonText, {
             fontSize: '18px',
-            backgroundColor: isCompleted ? '#222222' : '#333333',
-            color: isCompleted ? '#777777' : '#ffffff',
+            backgroundColor: buttonColor,
+            color: textColor,
             padding: {
                 x: 18,
                 y: 8
             }
         }).setDepth(4)
 
-        if (!isCompleted) {
+        // Нажимать можно только если контракт не выполнен и Рейнар способен идти на задание
+        if (!isCompleted && canStart) {
             startButton.setInteractive()
 
             startButton.on('pointerover', () => {

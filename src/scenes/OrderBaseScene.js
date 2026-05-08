@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { playerState, isContractCompleted } from '../data/playerState.js'
+import { playerState, isContractCompleted, restAtBase, REST_COST } from '../data/playerState.js'
 import { contracts } from '../data/contracts.js'
 
 export class OrderBaseScene extends Phaser.Scene {
@@ -119,6 +119,55 @@ export class OrderBaseScene extends Phaser.Scene {
             color: '#999999',
             lineSpacing: 7
         }).setDepth(3)
+
+        // Кнопка отдыха на базе
+        const restButton = this.add.text(115, 575, 'ОТДОХНУТЬ — ' + REST_COST + ' серебра', {
+            fontSize: '15px',
+            backgroundColor: '#333333',
+            color: '#ffffff',
+            padding: {
+                x: 12,
+                y: 8
+            }
+        }).setInteractive().setDepth(4)
+
+        restButton.on('pointerover', () => {
+            restButton.setStyle({
+                backgroundColor: '#555555'
+            })
+        })
+
+        restButton.on('pointerout', () => {
+            restButton.setStyle({
+                backgroundColor: '#333333'
+            })
+        })
+
+        restButton.on('pointerdown', () => {
+            const result = restAtBase()
+
+            // Показываем результат действия
+            this.showBaseMessage(result.message, result.success ? '#79ff79' : '#ff7777')
+
+            // Если отдых прошёл успешно — перерисовываем сцену, чтобы обновились HP, раны и серебро
+            if (result.success) {
+                this.time.delayedCall(700, () => {
+                    this.scene.restart()
+                })
+            }
+        })
+    }
+
+    showBaseMessage(message, color = '#ffffff') {
+        // Если старое сообщение уже есть — удаляем
+        if (this.baseMessageText) {
+            this.baseMessageText.destroy()
+        }
+
+        this.baseMessageText = this.add.text(440, 610, message, {
+            fontSize: '17px',
+            color: color
+        }).setDepth(10)
     }
 
     drawContractCard(contract, index) {

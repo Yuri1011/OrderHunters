@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { combatants } from '../data/combatants.js'
 import { getContractById, contracts } from '../data/contracts.js'
+import { playerState } from '../data/playerState.js'
 import { skills } from '../data/skills.js'
 
 export class BattleScene extends Phaser.Scene {
@@ -58,13 +59,13 @@ export class BattleScene extends Phaser.Scene {
             .setScale(0.30)
             .setDepth(2)
 
-        // Здоровье персонажей
-        this.hunterHP = this.hunterData.maxHP
-        this.trollHP = this.enemyData.maxHP
+        // Охотник начинает бой с тем HP, которое есть на базе
+        this.hunterHP = playerState.hp
+        this.hunterMaxHP = playerState.maxHP
 
-        // Максимальное здоровье нужно для расчёта HP-полосок
-        this.hunterMaxHP = this.hunterHP
-        this.trollMaxHP = this.trollHP
+        // Враг всегда начинает бой с полным HP
+        this.trollHP = this.enemyData.maxHP
+        this.trollMaxHP = this.enemyData.maxHP
 
         // Нижняя боевая панель
         this.uiPanel = this.add.graphics().setDepth(8)
@@ -106,7 +107,7 @@ export class BattleScene extends Phaser.Scene {
         this.trollHPBar = this.add.graphics().setDepth(10)
 
         // Текст HP
-        this.hunterHPText = this.add.text(190, 585, 'Охотник HP: 100', {
+        this.hunterHPText = this.add.text(190, 585, 'Охотник HP: ' + this.hunterHP, {
             fontSize: '20px',
             color: '#00ff00'
         }).setDepth(10)
@@ -347,7 +348,10 @@ export class BattleScene extends Phaser.Scene {
                     this.contract.reward.silverMin,
                     this.contract.reward.silverMax
                 ),
-                exp: this.contract.reward.exp
+                exp: this.contract.reward.exp,
+
+                // Сохраняем здоровье после боя
+                remainingHP: this.hunterHP
             })
         })
     }
@@ -372,7 +376,10 @@ export class BattleScene extends Phaser.Scene {
                 result: 'defeat',
                 contractId: this.contract.id,
                 silver: 0,
-                exp: this.contract.reward.defeatExp
+                exp: this.contract.reward.defeatExp,
+
+                // После поражения охотник выживает, но с минимальным HP
+                remainingHP: 1
             })
         })
     }

@@ -13,18 +13,23 @@ export class ContractResultScene extends Phaser.Scene {
         this.result = data.result || 'victory'
         this.silver = data.silver || 0
         this.exp = data.exp || 0
+        this.remainingHP = typeof data.remainingHP === 'number'
+            ? data.remainingHP
+            : playerState.hp
 
         if (this.result === 'victory') {
             playerState.silver += this.silver
             playerState.exp += this.exp
 
-            // После победы контракт считается выполненным
+            // После победы сохраняем фактическое HP после боя
+            playerState.hp = Math.max(this.remainingHP, 1)
+
             completeContract(this.contract.id)
         } else {
             playerState.exp += this.exp
 
-            // После провала охотник выживает, но получает последствия
-            playerState.hp = Math.max(playerState.hp - 25, 1)
+            // После поражения охотник выживает, но получает последствия
+            playerState.hp = 1
             playerState.wounds = 'лёгкое ранение'
         }
     }

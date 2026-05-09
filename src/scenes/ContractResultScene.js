@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { getContractById, contracts } from '../data/contracts.js'
-import { playerState, completeContract } from '../data/playerState.js'
+import { playerState, completeContract, savePlayerState, MAX_BANDAGES } from '../data/playerState.js'
 
 export class ContractResultScene extends Phaser.Scene {
     constructor() {
@@ -13,6 +13,8 @@ export class ContractResultScene extends Phaser.Scene {
         this.result = data.result || 'victory'
         this.silver = data.silver || 0
         this.exp = data.exp || 0
+        this.bandagesLoot = 0
+
         this.remainingHP = typeof data.remainingHP === 'number'
             ? data.remainingHP
             : playerState.hp
@@ -21,7 +23,7 @@ export class ContractResultScene extends Phaser.Scene {
             playerState.silver += this.silver
             playerState.exp += this.exp
 
-            // Сохраняем фактическое HP после боя
+            // После победы сохраняем фактическое HP после боя
             playerState.hp = Math.max(this.remainingHP, 1)
 
             // Ранения зависят от того, насколько тяжёлой была победа
@@ -33,6 +35,18 @@ export class ContractResultScene extends Phaser.Scene {
                 playerState.wounds = 'лёгкое ранение'
             }
 
+            // Добыча бинтов после победы
+            const rolledBandages = Phaser.Math.Between(
+                this.contract.reward.bandagesMin || 0,
+                this.contract.reward.bandagesMax || 0
+            )
+
+            const freeBandageSlots = Math.max(MAX_BANDAGES - playerState.bandages, 0)
+
+            this.bandagesLoot = Math.min(rolledBandages, freeBandageSlots)
+
+            playerState.bandages += this.bandagesLoot
+
             completeContract(this.contract.id)
         } else {
             playerState.exp += this.exp
@@ -41,6 +55,8 @@ export class ContractResultScene extends Phaser.Scene {
             playerState.hp = 1
             playerState.wounds = 'тяжёлое ранение'
         }
+
+        savePlayerState()
     }
 
     create() {
@@ -82,17 +98,22 @@ export class ContractResultScene extends Phaser.Scene {
             color: '#dddddd'
         })
 
-        this.add.text(430, 465, 'Состояние: ' + playerState.hp + ' / ' + playerState.maxHP, {
+        this.add.text(430, 460, 'Бинты: +' + this.bandagesLoot, {
             fontSize: '22px',
             color: '#dddddd'
         })
 
-        this.add.text(430, 505, 'Раны: ' + playerState.wounds, {
+        this.add.text(430, 505, 'Состояние: ' + playerState.hp + ' / ' + playerState.maxHP, {
+            fontSize: '22px',
+            color: '#dddddd'
+        })
+
+        this.add.text(430, 545, 'Раны: ' + playerState.wounds, {
             fontSize: '22px',
             color: playerState.wounds === 'нет' ? '#79ff79' : '#ffaa55'
         })
 
-        const backButton = this.add.text(470, 540, 'ВЕРНУТЬСЯ В ОРДЕН', {
+        const backButton = this.add.text(470, 600, 'ВЕРНУТЬСЯ В ОРДЕН', {
             fontSize: '22px',
             backgroundColor: '#333333',
             color: '#ffffff',

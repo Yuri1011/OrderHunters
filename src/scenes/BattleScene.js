@@ -1,8 +1,8 @@
 import Phaser from 'phaser'
 import { combatants } from '../data/combatants.js'
 import { getContractById, contracts } from '../data/contracts.js'
-import { playerState, getEffectiveMaxHP } from '../data/playerState.js'
-import { skills } from '../data/skills.js'
+import { playerState, getEffectiveMaxHP, savePlayerState } from '../data/playerState.js'
+import { skills, playerActions, getPlayerActionById } from '../data/skills.js'
 
 export class BattleScene extends Phaser.Scene {
     constructor() {
@@ -126,67 +126,79 @@ export class BattleScene extends Phaser.Scene {
         // Первый рендер HP-полосок
         this.drawHPBars()
 
-        // Кнопка: удар
-        const attackText = this.add.text(470, 650, 'УДАР', {
-            fontSize: '24px',
-            backgroundColor: '#333333',
-            color: '#ffffff',
-            padding: {
-                x: 14,
-                y: 8
-            }
-        }).setInteractive().setDepth(10)
+        // Текст активных эффектов на охотнике
+        this.effectsText = this.add.text(190, 645, 'Эффекты: нет', {
+            fontSize: '15px',
+            color: '#cccccc'
+        }).setDepth(10)
 
-        attackText.on('pointerdown', () => {
-            this.attack()
+        // Количество бинтов в бою
+        this.bandagesText = this.add.text(190, 670, 'Бинты: ' + playerState.bandages, {
+            fontSize: '15px',
+            color: '#cccccc'
+        }).setDepth(10)
+
+        this.updateEffectsText()
+        this.updateBandagesText()
+
+        // Кнопки действий охотника теперь создаются из skills.js
+        this.actionButtons = []
+
+        const buttonStartX = 420
+        const buttonY = 650
+        const buttonGap = 135
+
+        playerActions.forEach((action, index) => {
+            const actionButton = this.add.text(buttonStartX + index * buttonGap, buttonY, action.label, {
+                fontSize: '22px',
+                backgroundColor: '#333333',
+                color: '#ffffff',
+                padding: {
+                    x: 12,
+                    y: 8
+                }
+            }).setInteractive().setDepth(10)
+
+            actionButton.on('pointerdown', () => {
+                this.handlePlayerAction(action.id)
+            })
+
+            this.actionButtons.push(actionButton)
         })
-
-        // Кнопка: защита
-        const defendText = this.add.text(600, 650, 'ЗАЩИТА', {
-            fontSize: '24px',
-            backgroundColor: '#333333',
-            color: '#ffffff',
-            padding: {
-                x: 14,
-                y: 8
-            }
-        }).setInteractive().setDepth(10)
-
-        defendText.on('pointerdown', () => {
-            this.defend()
-        })
-
-        // Кнопка: навык
-        const skillText = this.add.text(770, 650, 'НАВЫК', {
-            fontSize: '24px',
-            backgroundColor: '#333333',
-            color: '#ffffff',
-            padding: {
-                x: 14,
-                y: 8
-            }
-        }).setInteractive().setDepth(10)
-
-        skillText.on('pointerdown', () => {
-            this.skillAttack()
-        })
-
-        // Сохраняем кнопки, чтобы отключать их во время хода врага
-        this.actionButtons = [attackText, defendText, skillText]
 
         this.addBattleLog('Бой начался')
     }
 
-    attack() {
+    handlePlayerAction(actionId) {
+        const action = getPlayerActionById(actionId)
+
+        if (!action) return
+
+        if (action.type === 'damage') {
+            this.runDamageAction(action)
+            return
+        }
+
+        if (action.type === 'defend') {
+            this.defend()
+            return
+        }
+
+        if (action.type === 'bandage') {
+            this.bandage()
+        }
+    }
+
+    runDamageAction(action) {
         if (this.turn !== 'player') return
         if (this.trollHP <= 0) return
 
         this.setActionButtonsEnabled(false)
-        this.setStatus('Охотник атакует')
+        this.setStatus(action.statusText)
 
         let damage = Phaser.Math.Between(
-            skills.hunterAttack.minDamage,
-            skills.hunterAttack.maxDamage
+            action.minDamage,
+            action.maxDamage
         )
 
         if (this.firstStrikeBonus > 0) {
@@ -203,16 +215,16 @@ export class BattleScene extends Phaser.Scene {
         this.trollHP = Math.max(this.trollHP, 0)
 
         this.trollHPText.setText(this.enemyData.name + ' HP: ' + this.trollHP)
-        this.addBattleLog(skills.hunterAttack.logText + ' ' + damage + ' урона')
+        this.addBattleLog(action.logText + ' ' + damage + ' урона')
+
         this.showDamage(this.troll.x, this.troll.y - 260, damage)
         this.hitEffect(this.troll)
         this.drawHPBars()
 
-        // Анимация рывка охотника к врагу
         this.tweens.add({
             targets: this.hunter,
-            x: 500,
-            duration: 150,
+            x: action.moveX,
+            duration: action.moveDuration,
             yoyo: true
         })
 
@@ -228,56 +240,77 @@ export class BattleScene extends Phaser.Scene {
         })
     }
 
+    attack() {
+        this.handlePlayerAction('attack')
+    }
+
     skillAttack() {
-        if (this.turn !== 'player') return
-        if (this.trollHP <= 0) return
-
-        this.setActionButtonsEnabled(false)
-        this.setStatus('Охотник использует навык')
-
-        const damage = Phaser.Math.Between(
-            skills.hunterSkill.minDamage,
-            skills.hunterSkill.maxDamage
-        )
-
-        this.trollHP -= damage
-        this.trollHP = Math.max(this.trollHP, 0)
-
-        this.trollHPText.setText(this.enemyData.name + ' HP: ' + this.trollHP)
-        this.addBattleLog(skills.hunterSkill.logText + ' ' + damage + ' урона')
-        this.showDamage(this.troll.x, this.troll.y - 260, damage)
-        this.hitEffect(this.troll)
-        this.drawHPBars()
-
-        // Навык — более сильный рывок охотника
-        this.tweens.add({
-            targets: this.hunter,
-            x: 540,
-            duration: 200,
-            yoyo: true
-        })
-
-        if (this.trollHP <= 0) {
-            this.enemyDead()
-            return
-        }
-
-        this.turn = 'enemy'
-
-        this.time.delayedCall(800, () => {
-            this.enemyAttack()
-        })
+        this.handlePlayerAction('powerStrike')
     }
 
     defend() {
         if (this.turn !== 'player') return
         if (this.hunterHP <= 0 || this.trollHP <= 0) return
 
+        const action = getPlayerActionById('defend')
+
         this.setActionButtonsEnabled(false)
-        this.setStatus('Охотник защищается')
-        this.addBattleLog('Охотник приготовился к защите')
+        this.setStatus(action.statusText)
+        this.addBattleLog(action.logText)
 
         this.isDefending = true
+        this.turn = 'enemy'
+
+        this.time.delayedCall(800, () => {
+            this.enemyAttack()
+        })
+    }
+
+    bandage() {
+        if (this.turn !== 'player') return
+        if (this.hunterHP <= 0 || this.trollHP <= 0) return
+
+        // Если кровотечения нет — ход не тратим
+        if (!this.activeEffects.bleed) {
+            this.setStatus('Перевязка не нужна', '#ffaa55')
+            this.addBattleLog('Кровотечения нет')
+
+            this.time.delayedCall(800, () => {
+                if (this.turn === 'player') {
+                    this.setStatus('Ход охотника')
+                }
+            })
+
+            return
+        }
+
+        // Если бинтов нет — ход тоже не тратим
+        if (playerState.bandages <= 0) {
+            this.setStatus('Нет бинтов', '#ff7777')
+            this.addBattleLog('Бинты закончились')
+
+            this.time.delayedCall(800, () => {
+                if (this.turn === 'player') {
+                    this.setStatus('Ход охотника')
+                }
+            })
+
+            return
+        }
+
+        // Если кровотечение есть и бинты есть — снимаем эффект, тратим ход
+        this.setActionButtonsEnabled(false)
+
+        playerState.bandages -= 1
+        savePlayerState()
+        this.updateBandagesText()
+
+        this.activeEffects.bleed = null
+        this.updateEffectsText()
+
+        this.setStatus('Охотник делает перевязку')
+        this.addBattleLog('Кровотечение остановлено. Бинтов: ' + playerState.bandages)
+
         this.turn = 'enemy'
 
         this.time.delayedCall(800, () => {
@@ -329,6 +362,36 @@ export class BattleScene extends Phaser.Scene {
 
             this.addBattleLog('Охотник истекает кровью')
             this.setStatus('Кровотечение', '#ff5555')
+            this.updateEffectsText()
+        }
+    }
+
+    updateEffectsText() {
+        const effects = []
+
+        const bleed = this.activeEffects.bleed
+
+        if (bleed) {
+            effects.push('кровотечение — ' + bleed.turns + ' хода')
+        }
+
+        if (effects.length === 0) {
+            this.effectsText.setText('Эффекты: нет')
+            this.effectsText.setColor('#cccccc')
+            return
+        }
+
+        this.effectsText.setText('Эффекты: ' + effects.join(', '))
+        this.effectsText.setColor('#ff7777')
+    }
+
+    updateBandagesText() {
+        this.bandagesText.setText('Бинты: ' + playerState.bandages)
+
+        if (playerState.bandages <= 0) {
+            this.bandagesText.setColor('#ff7777')
+        } else {
+            this.bandagesText.setColor('#cccccc')
         }
     }
 
@@ -352,6 +415,8 @@ export class BattleScene extends Phaser.Scene {
             this.activeEffects.bleed = null
             this.addBattleLog('Кровотечение остановилось')
         }
+
+        this.updateEffectsText()
 
         if (this.hunterHP <= 0) {
             this.playerDead()

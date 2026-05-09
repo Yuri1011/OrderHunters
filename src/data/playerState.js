@@ -1,4 +1,8 @@
 export const REST_COST = 10
+export const BANDAGE_COST = 5
+export const MAX_BANDAGES = 3
+
+const SAVE_KEY = 'orderOfHuntersPlayerState'
 
 export const playerState = {
     name: 'Рейнар Вельм',
@@ -11,6 +15,9 @@ export const playerState = {
     exp: 0,
 
     wounds: 'нет',
+
+    // Расходники
+    bandages: 2,
 
     // Список выполненных контрактов
     completedContracts: []
@@ -39,11 +46,48 @@ export const woundEffects = {
     }
 }
 
+export function savePlayerState() {
+    // Сохраняем состояние игрока в браузер
+    localStorage.setItem(SAVE_KEY, JSON.stringify(playerState))
+}
+
+export function loadPlayerState() {
+    const savedState = localStorage.getItem(SAVE_KEY)
+
+    if (!savedState) return
+
+    try {
+        const parsedState = JSON.parse(savedState)
+
+        // Аккуратно подмешиваем сохранённые данные в текущее состояние
+        Object.assign(playerState, parsedState)
+
+        // На всякий случай защищаемся от битого сохранения
+        if (!Array.isArray(playerState.completedContracts)) {
+            playerState.completedContracts = []
+        }
+
+        if (typeof playerState.bandages !== 'number') {
+            playerState.bandages = 2
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки сохранения:', error)
+    }
+}
+
+export function resetPlayerState() {
+    // Полный сброс сохранения, пригодится для тестов
+    localStorage.removeItem(SAVE_KEY)
+    location.reload()
+}
+
 export function completeContract(contractId) {
     // Не добавляем один и тот же контракт дважды
     if (!playerState.completedContracts.includes(contractId)) {
         playerState.completedContracts.push(contractId)
     }
+
+    savePlayerState()
 }
 
 export function isContractCompleted(contractId) {
@@ -94,8 +138,42 @@ export function restAtBase() {
     playerState.hp = playerState.maxHP
     playerState.wounds = 'нет'
 
+    savePlayerState()
+
     return {
         success: true,
         message: 'Рейнар отдохнул и восстановил силы.'
     }
 }
+
+export function buyBandageAtBase() {
+    // Нельзя носить бесконечно много бинтов
+    if (playerState.bandages >= MAX_BANDAGES) {
+        return {
+            success: false,
+            message: 'Больше бинтов не унести.'
+        }
+    }
+
+    // Проверяем серебро
+    if (playerState.silver < BANDAGE_COST) {
+        return {
+            success: false,
+            message: 'Недостаточно серебра для покупки бинта.'
+        }
+    }
+
+    // Покупка
+    playerState.silver -= BANDAGE_COST
+    playerState.bandages += 1
+
+    savePlayerState()
+
+    return {
+        success: true,
+        message: 'Бинт добавлен в припасы.'
+    }
+}
+
+// Загружаем сохранение сразу при старте игры
+loadPlayerState()

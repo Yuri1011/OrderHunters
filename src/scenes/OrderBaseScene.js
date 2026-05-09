@@ -3,7 +3,10 @@ import {
     playerState,
     isContractCompleted,
     restAtBase,
+    buyBandageAtBase,
     REST_COST,
+    BANDAGE_COST,
+    MAX_BANDAGES,
     canTakeContract,
     getEffectiveMaxHP
 } from '../data/playerState.js'
@@ -116,25 +119,30 @@ export class OrderBaseScene extends Phaser.Scene {
             color: '#cccccc'
         }).setDepth(3)
 
+        this.add.text(115, 425, 'Бинты: ' + playerState.bandages + ' / ' + MAX_BANDAGES, {
+            fontSize: '16px',
+            color: '#cccccc'
+        }).setDepth(3)
+
         this.add.text(115, 455, 'Шип Ордена', {
             fontSize: '20px',
             color: '#ffffff'
         }).setDepth(3)
 
-        this.add.text(115, 490, 'Редкий знак свободы.\nОрден больше не имеет\nправа удерживать его.', {
-            fontSize: '15px',
+        this.add.text(115, 485, 'Редкий знак свободы.\nОрден больше не имеет\nправа удерживать его.', {
+            fontSize: '14px',
             color: '#999999',
-            lineSpacing: 7
+            lineSpacing: 5
         }).setDepth(3)
 
         // Кнопка отдыха на базе
-        const restButton = this.add.text(115, 575, 'ОТДОХНУТЬ — ' + REST_COST + ' серебра', {
-            fontSize: '15px',
+        const restButton = this.add.text(115, 550, 'ОТДОХНУТЬ — ' + REST_COST + ' серебра', {
+            fontSize: '14px',
             backgroundColor: '#333333',
             color: '#ffffff',
             padding: {
-                x: 12,
-                y: 8
+                x: 10,
+                y: 7
             }
         }).setInteractive().setDepth(4)
 
@@ -153,10 +161,43 @@ export class OrderBaseScene extends Phaser.Scene {
         restButton.on('pointerdown', () => {
             const result = restAtBase()
 
-            // Показываем результат действия
             this.showBaseMessage(result.message, result.success ? '#79ff79' : '#ff7777')
 
-            // Если отдых прошёл успешно — перерисовываем сцену, чтобы обновились HP, раны и серебро
+            if (result.success) {
+                this.time.delayedCall(700, () => {
+                    this.scene.restart()
+                })
+            }
+        })
+
+        // Кнопка покупки бинта
+        const buyBandageButton = this.add.text(115, 590, 'КУПИТЬ БИНТ — ' + BANDAGE_COST + ' серебра', {
+            fontSize: '14px',
+            backgroundColor: '#333333',
+            color: '#ffffff',
+            padding: {
+                x: 10,
+                y: 7
+            }
+        }).setInteractive().setDepth(4)
+
+        buyBandageButton.on('pointerover', () => {
+            buyBandageButton.setStyle({
+                backgroundColor: '#555555'
+            })
+        })
+
+        buyBandageButton.on('pointerout', () => {
+            buyBandageButton.setStyle({
+                backgroundColor: '#333333'
+            })
+        })
+
+        buyBandageButton.on('pointerdown', () => {
+            const result = buyBandageAtBase()
+
+            this.showBaseMessage(result.message, result.success ? '#79ff79' : '#ff7777')
+
             if (result.success) {
                 this.time.delayedCall(700, () => {
                     this.scene.restart()

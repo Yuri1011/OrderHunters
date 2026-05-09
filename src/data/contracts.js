@@ -18,7 +18,9 @@ export const contracts = [
             silverMin: 45,
             silverMax: 80,
             exp: 20,
-            defeatExp: 5
+            defeatExp: 5,
+            bandagesMin: 0,
+            bandagesMax: 1
         },
 
         travelEvent: {
@@ -68,7 +70,9 @@ export const contracts = [
             silverMin: 30,
             silverMax: 55,
             exp: 15,
-            defeatExp: 4
+            defeatExp: 4,
+            bandagesMin: 0,
+            bandagesMax: 2
         },
 
         travelEvent: {

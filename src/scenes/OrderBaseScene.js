@@ -1,230 +1,504 @@
 import Phaser from 'phaser'
+import { contracts } from '../data/contracts.js'
+import { baseBuildings, getBaseBuildingById } from '../data/baseBuildings.js'
+
 import {
     playerState,
     isContractCompleted,
     restAtBase,
     buyBandageAtBase,
-    REST_COST,
+    getRestCost,
+    upgradeInfirmary,
     BANDAGE_COST,
     MAX_BANDAGES,
+    INFIRMARY_UPGRADE_COST,
     canTakeContract,
     getEffectiveMaxHP
 } from '../data/playerState.js'
-import { contracts } from '../data/contracts.js'
 
 export class OrderBaseScene extends Phaser.Scene {
     constructor() {
         super('OrderBaseScene')
     }
 
+    init(data) {
+        this.selectedBuildingId = data?.selectedBuildingId || 'contracts'
+    }
+
     create() {
-        this.cameras.main.setBackgroundColor('#080808')
+        this.infoPanelObjects = []
+        this.baseMessageText = null
 
-        // Общий тёмный фон
-        this.add.rectangle(640, 360, 1280, 720, 0x0b0b0b).setDepth(0)
+        this.cameras.main.setBackgroundColor('#050505')
 
-        // Основная рамка экрана
-        this.add.rectangle(640, 360, 1180, 640, 0x111111)
+        this.drawBackground()
+        this.drawTopBar()
+        this.drawHunterPanel()
+        this.drawBaseArea()
+        this.drawBottomNav()
+
+        this.showBuildingInfo(this.selectedBuildingId)
+    }
+
+    drawBackground() {
+        this.add.rectangle(640, 360, 1280, 720, 0x080808).setDepth(0)
+
+        this.add.rectangle(640, 360, 1220, 660, 0x111111)
             .setStrokeStyle(2, 0x2f2f2f)
             .setDepth(1)
+    }
 
-        // Верхняя панель
-        this.add.rectangle(640, 65, 1180, 80, 0x151515)
+    drawTopBar() {
+        this.add.rectangle(640, 55, 1220, 70, 0x151515)
             .setStrokeStyle(1, 0x3a3a3a)
             .setDepth(2)
 
-        this.add.text(90, 38, 'ОРДЕН ОХОТНИКОВ', {
-            fontSize: '30px',
+        this.add.text(55, 30, 'ОРДЕН ОХОТНИКОВ', {
+            fontSize: '28px',
             color: '#ffffff'
         }).setDepth(3)
 
-        this.add.text(940, 45, 'Морвальд ждёт охотника', {
-            fontSize: '16px',
-            color: '#999999'
-        }).setDepth(3)
-
-        // Левая панель персонажа
-        this.drawHunterPanel()
-
-        // Центральная область с контрактами
-        this.add.text(440, 140, 'Доступные контракты', {
-            fontSize: '32px',
-            color: '#ffffff'
-        }).setDepth(3)
-
-        this.add.text(440, 180, 'Выбери задание, которое Орден готов доверить охотнику.', {
+        this.add.text(390, 35, 'Серебро: ' + playerState.silver, {
             fontSize: '17px',
-            color: '#999999'
+            color: '#cccccc'
+        }).setDepth(3)
+
+        this.add.text(560, 35, 'Бинты: ' + playerState.bandages + ' / ' + MAX_BANDAGES, {
+            fontSize: '17px',
+            color: '#cccccc'
+        }).setDepth(3)
+
+        this.add.text(740, 35, 'Опыт: ' + playerState.exp, {
+            fontSize: '17px',
+            color: '#cccccc'
         }).setDepth(3)
 
         const completedCount = contracts.filter((contract) => {
             return isContractCompleted(contract.id)
         }).length
 
-        this.add.text(440, 205, 'Выполнено контрактов: ' + completedCount + ' / ' + contracts.length, {
-            fontSize: '15px',
-            color: '#777777'
+        this.add.text(930, 35, 'Контракты: ' + completedCount + ' / ' + contracts.length, {
+            fontSize: '17px',
+            color: '#999999'
         }).setDepth(3)
-
-        // Рисуем карточки контрактов из массива contracts
-        contracts.forEach((contract, index) => {
-            this.drawContractCard(contract, index)
-        })
-
-        // Нижняя подпись
-        this.add.text(640, 660, 'Контракты берутся из данных игры. Позже здесь появятся регионы, цепочки заданий и последствия выбора.', {
-            fontSize: '14px',
-            color: '#777777',
-            align: 'center',
-            wordWrap: {
-                width: 760
-            }
-        })
-            .setOrigin(0.5, 0)
-            .setDepth(3)
     }
 
     drawHunterPanel() {
-        const hunterPanel = this.add.graphics().setDepth(2)
+        const panel = this.add.graphics().setDepth(2)
 
-        hunterPanel.fillStyle(0x151515, 0.95)
-        hunterPanel.fillRoundedRect(80, 130, 300, 500, 18)
+        panel.fillStyle(0x141414, 0.96)
+        panel.fillRoundedRect(50, 110, 270, 530, 16)
 
-        hunterPanel.lineStyle(2, 0x444444, 1)
-        hunterPanel.strokeRoundedRect(80, 130, 300, 500, 18)
+        panel.lineStyle(2, 0x444444, 1)
+        panel.strokeRoundedRect(50, 110, 270, 530, 16)
 
-        this.add.text(115, 165, playerState.name, {
-            fontSize: '26px',
+        this.add.text(85, 145, playerState.name, {
+            fontSize: '24px',
             color: '#ffffff'
         }).setDepth(3)
 
-        this.add.text(115, 205, playerState.title, {
-            fontSize: '17px',
-            color: '#b0b0b0'
+        this.add.text(85, 180, playerState.title, {
+            fontSize: '16px',
+            color: '#999999'
         }).setDepth(3)
 
-        this.add.text(115, 265, 'Состояние', {
+        this.add.text(85, 240, 'Состояние', {
             fontSize: '20px',
             color: '#ffffff'
         }).setDepth(3)
 
-        this.add.text(115, 305, 'Здоровье: ' + playerState.hp + ' / ' + getEffectiveMaxHP(), {
-            fontSize: '16px',
+        this.add.text(85, 280, 'Здоровье: ' + playerState.hp + ' / ' + getEffectiveMaxHP(), {
+            fontSize: '15px',
             color: '#79ff79'
         }).setDepth(3)
 
-        this.add.text(115, 335, 'Раны: ' + playerState.wounds, {
-            fontSize: '16px',
+        this.add.text(85, 310, 'Раны: ' + playerState.wounds, {
+            fontSize: '15px',
+            color: playerState.wounds === 'нет' ? '#cccccc' : '#ffaa55'
+        }).setDepth(3)
+
+        this.add.text(85, 340, 'Серебро: ' + playerState.silver, {
+            fontSize: '15px',
             color: '#cccccc'
         }).setDepth(3)
 
-        this.add.text(115, 365, 'Опыт: ' + playerState.exp, {
-            fontSize: '16px',
+        this.add.text(85, 370, 'Бинты: ' + playerState.bandages + ' / ' + MAX_BANDAGES, {
+            fontSize: '15px',
             color: '#cccccc'
         }).setDepth(3)
 
-        this.add.text(115, 395, 'Серебро: ' + playerState.silver, {
-            fontSize: '16px',
-            color: '#cccccc'
-        }).setDepth(3)
-
-        this.add.text(115, 425, 'Бинты: ' + playerState.bandages + ' / ' + MAX_BANDAGES, {
-            fontSize: '16px',
-            color: '#cccccc'
-        }).setDepth(3)
-
-        this.add.text(115, 455, 'Шип Ордена', {
-            fontSize: '20px',
+        this.add.text(85, 430, 'Шип Ордена', {
+            fontSize: '19px',
             color: '#ffffff'
         }).setDepth(3)
 
-        this.add.text(115, 485, 'Редкий знак свободы.\nОрден больше не имеет\nправа удерживать его.', {
+        this.add.text(85, 465, 'Редкий знак свободы.\nОрден больше не имеет\nправа удерживать его.', {
             fontSize: '14px',
             color: '#999999',
-            lineSpacing: 5
+            lineSpacing: 6
+        }).setDepth(3)
+    }
+
+    drawBaseArea() {
+        const area = this.add.graphics().setDepth(2)
+
+        area.fillStyle(0x101010, 0.96)
+        area.fillRoundedRect(350, 110, 540, 530, 16)
+
+        area.lineStyle(2, 0x333333, 1)
+        area.strokeRoundedRect(350, 110, 540, 530, 16)
+
+        this.add.text(500, 135, 'База Ордена', {
+            fontSize: '30px',
+            color: '#ffffff'
         }).setDepth(3)
 
-        // Кнопка отдыха на базе
-        const restButton = this.add.text(115, 550, 'ОТДОХНУТЬ — ' + REST_COST + ' серебра', {
-            fontSize: '14px',
-            backgroundColor: '#333333',
-            color: '#ffffff',
-            padding: {
-                x: 10,
-                y: 7
-            }
-        }).setInteractive().setDepth(4)
+        this.add.text(440, 175, 'Двор крепости, здания и места службы охотников.', {
+            fontSize: '15px',
+            color: '#888888'
+        }).setDepth(3)
 
-        restButton.on('pointerover', () => {
-            restButton.setStyle({
-                backgroundColor: '#555555'
-            })
+        // Схематичный двор базы. Позже заменим это на полноценный арт-фон.
+        this.add.rectangle(620, 390, 410, 300, 0x181818)
+            .setStrokeStyle(1, 0x2f2f2f)
+            .setDepth(2)
+
+        this.add.rectangle(610, 260, 130, 80, 0x222222)
+            .setStrokeStyle(1, 0x555555)
+            .setDepth(2)
+
+        this.add.rectangle(455, 455, 120, 75, 0x1c1c1c)
+            .setStrokeStyle(1, 0x444444)
+            .setDepth(2)
+
+        this.add.rectangle(770, 360, 135, 200, 0x1c1c1c)
+            .setStrokeStyle(1, 0x444444)
+            .setDepth(2)
+
+        this.add.rectangle(600, 545, 160, 70, 0x1b1b1b)
+            .setStrokeStyle(1, 0x444444)
+            .setDepth(2)
+
+        baseBuildings.forEach((building) => {
+            this.drawBuildingMarker(building)
+        })
+    }
+
+    drawBuildingMarker(building) {
+        const isSelected = building.id === this.selectedBuildingId
+
+        const marker = this.add.rectangle(
+            building.x,
+            building.y,
+            150,
+            42,
+            isSelected ? 0x3a2a16 : 0x191919
+        )
+            .setStrokeStyle(2, isSelected ? 0xc49a4a : 0x555555)
+            .setInteractive()
+            .setDepth(5)
+
+        this.add.text(building.x, building.y - 9, building.title, {
+            fontSize: '15px',
+            color: isSelected ? '#ffdd99' : '#dddddd'
+        })
+            .setOrigin(0.5)
+            .setDepth(6)
+
+        this.add.text(building.x, building.y + 10, building.subtitle, {
+            fontSize: '11px',
+            color: '#888888'
+        })
+            .setOrigin(0.5)
+            .setDepth(6)
+
+        marker.on('pointerover', () => {
+            marker.setFillStyle(0x2b2b2b)
         })
 
-        restButton.on('pointerout', () => {
-            restButton.setStyle({
-                backgroundColor: '#333333'
-            })
+        marker.on('pointerout', () => {
+            marker.setFillStyle(isSelected ? 0x3a2a16 : 0x191919)
         })
 
-        restButton.on('pointerdown', () => {
+        marker.on('pointerdown', () => {
+            this.scene.restart({
+                selectedBuildingId: building.id
+            })
+        })
+    }
+
+    drawBottomNav() {
+        this.add.rectangle(640, 675, 1220, 55, 0x151515)
+            .setStrokeStyle(1, 0x333333)
+            .setDepth(2)
+
+        const items = [
+            'КОНТРАКТЫ',
+            'ОХОТНИКИ',
+            'ИНВЕНТАРЬ',
+            'КАРТА',
+            'УЛУЧШЕНИЯ'
+        ]
+
+        items.forEach((item, index) => {
+            this.add.text(360 + index * 140, 662, item, {
+                fontSize: '15px',
+                color: index === 0 ? '#ffffff' : '#888888'
+            }).setDepth(3)
+        })
+    }
+
+    showBuildingInfo(buildingId) {
+        this.clearInfoPanel()
+
+        const building = getBaseBuildingById(buildingId)
+
+        if (!building) return
+
+        this.drawInfoPanelFrame(building.title, building.subtitle)
+
+        if (buildingId === 'contracts') {
+            this.drawContractsInfo()
+            return
+        }
+
+        if (buildingId === 'infirmary') {
+            this.drawInfirmaryInfo()
+            return
+        }
+
+        if (buildingId === 'storage') {
+            this.drawStorageInfo()
+            return
+        }
+
+        if (buildingId === 'training') {
+            this.drawPlaceholderInfo(
+                'Тренировочный двор',
+                'Здесь охотники будут получать улучшения, новые приёмы и боевые черты.'
+            )
+            return
+        }
+
+        if (buildingId === 'council') {
+            this.drawPlaceholderInfo(
+                'Совет Ордена',
+                'Здесь позже появятся решения Ордена, репутация и крупные сюжетные выборы.'
+            )
+            return
+        }
+
+        if (buildingId === 'rest') {
+            this.drawPlaceholderInfo(
+                'Место отдыха',
+                'Здесь охотники будут восстанавливать дух, снимать усталость и готовиться к новым контрактам.'
+            )
+        }
+    }
+
+    drawInfoPanelFrame(title, subtitle) {
+        const panel = this.add.graphics().setDepth(8)
+
+        panel.fillStyle(0x141414, 0.97)
+        panel.fillRoundedRect(925, 110, 300, 530, 16)
+
+        panel.lineStyle(2, 0x444444, 1)
+        panel.strokeRoundedRect(925, 110, 300, 530, 16)
+
+        this.infoPanelObjects.push(panel)
+
+        this.addInfoText(955, 140, title, 23, '#ffffff')
+        this.addInfoText(955, 175, subtitle, 15, '#999999')
+    }
+
+    drawContractsInfo() {
+        this.addInfoText(955, 220, 'Доступные задания', 18, '#ffffff')
+
+        contracts.forEach((contract, index) => {
+            this.drawContractRow(contract, index)
+        })
+    }
+
+    drawContractRow(contract, index) {
+        const y = 255 + index * 110
+
+        const isCompleted = isContractCompleted(contract.id)
+        const isUnlocked = this.isContractUnlocked(contract)
+        const canStart = canTakeContract() && isUnlocked && !isCompleted
+
+        const row = this.add.graphics().setDepth(9)
+
+        row.fillStyle(isCompleted || !isUnlocked ? 0x101010 : 0x1c1c1c, 0.96)
+        row.fillRoundedRect(950, y, 250, 95, 10)
+
+        row.lineStyle(1, isUnlocked ? 0x555555 : 0x442222, 1)
+        row.strokeRoundedRect(950, y, 250, 95, 10)
+
+        this.infoPanelObjects.push(row)
+
+        this.addInfoText(965, y + 12, contract.title, 15, isUnlocked ? '#ffffff' : '#777777')
+        this.addInfoText(965, y + 37, 'Опасность: ' + contract.danger, 13, isUnlocked ? contract.dangerColor : '#777777')
+
+        if (isCompleted) {
+            this.addInfoText(965, y + 62, 'Статус: выполнен', 13, '#79ff79')
+        } else if (!isUnlocked) {
+            this.addInfoText(965, y + 62, this.getLockedReason(contract), 12, '#ff9999')
+        } else if (!canTakeContract()) {
+            this.addInfoText(965, y + 62, 'Нужен отдых', 13, '#ff7777')
+        } else {
+            this.addInfoText(965, y + 62, 'Статус: доступен', 13, '#cccccc')
+        }
+
+        const buttonText = isCompleted
+            ? 'ВЫПОЛНЕН'
+            : !isUnlocked
+                ? 'ЗАКРЫТ'
+                : !canTakeContract()
+                    ? 'ОТДЫХ'
+                    : 'ВЗЯТЬ'
+
+        this.addInfoButton(1105, y + 55, buttonText, () => {
+            this.scene.start('ContractTravelScene', {
+                contractId: contract.id
+            })
+        }, !canStart)
+    }
+
+    drawInfirmaryInfo() {
+        this.addInfoText(955, 220, 'Лазарет: уровень ' + playerState.base.infirmaryLevel, 18, '#ffffff')
+        this.addInfoText(955, 255, 'Отдых: ' + getRestCost() + ' серебра', 15, '#cccccc')
+        this.addInfoText(955, 285, 'Снимает раны и полностью восстанавливает здоровье.', 14, '#999999', 230)
+
+        this.addInfoButton(955, 350, 'ОТДОХНУТЬ', () => {
             const result = restAtBase()
 
             this.showBaseMessage(result.message, result.success ? '#79ff79' : '#ff7777')
 
             if (result.success) {
                 this.time.delayedCall(700, () => {
-                    this.scene.restart()
+                    this.scene.restart({
+                        selectedBuildingId: 'infirmary'
+                    })
                 })
             }
         })
 
-        // Кнопка покупки бинта
-        const buyBandageButton = this.add.text(115, 590, 'КУПИТЬ БИНТ — ' + BANDAGE_COST + ' серебра', {
-            fontSize: '14px',
-            backgroundColor: '#333333',
-            color: '#ffffff',
-            padding: {
-                x: 10,
-                y: 7
-            }
-        }).setInteractive().setDepth(4)
+        const isUpgraded = playerState.base.infirmaryLevel >= 1
 
-        buyBandageButton.on('pointerover', () => {
-            buyBandageButton.setStyle({
-                backgroundColor: '#555555'
-            })
-        })
+        this.addInfoButton(
+            955,
+            405,
+            isUpgraded ? 'ЛАЗАРЕТ УЛУЧШЕН' : 'УЛУЧШИТЬ — ' + INFIRMARY_UPGRADE_COST,
+            () => {
+                const result = upgradeInfirmary()
 
-        buyBandageButton.on('pointerout', () => {
-            buyBandageButton.setStyle({
-                backgroundColor: '#333333'
-            })
-        })
+                this.showBaseMessage(result.message, result.success ? '#79ff79' : '#ff7777')
 
-        buyBandageButton.on('pointerdown', () => {
+                if (result.success) {
+                    this.time.delayedCall(700, () => {
+                        this.scene.restart({
+                            selectedBuildingId: 'infirmary'
+                        })
+                    })
+                }
+            },
+            isUpgraded
+        )
+    }
+
+    drawStorageInfo() {
+        this.addInfoText(955, 220, 'Припасы', 18, '#ffffff')
+        this.addInfoText(955, 255, 'Бинты: ' + playerState.bandages + ' / ' + MAX_BANDAGES, 15, '#cccccc')
+        this.addInfoText(955, 285, 'Бинты нужны для перевязки кровотечения в бою.', 14, '#999999', 230)
+
+        this.addInfoButton(955, 350, 'КУПИТЬ БИНТ — ' + BANDAGE_COST, () => {
             const result = buyBandageAtBase()
 
             this.showBaseMessage(result.message, result.success ? '#79ff79' : '#ff7777')
 
             if (result.success) {
                 this.time.delayedCall(700, () => {
-                    this.scene.restart()
+                    this.scene.restart({
+                        selectedBuildingId: 'storage'
+                    })
                 })
             }
         })
     }
 
+    drawPlaceholderInfo(title, text) {
+        this.addInfoText(955, 220, title, 18, '#ffffff')
+        this.addInfoText(955, 260, text, 14, '#999999', 230)
+        this.addInfoText(955, 350, 'Система будет добавлена позже.', 14, '#777777', 230)
+    }
+
+    addInfoText(x, y, text, fontSize, color, wrapWidth = null) {
+        const textObject = this.add.text(x, y, text, {
+            fontSize: fontSize + 'px',
+            color,
+            wordWrap: wrapWidth ? { width: wrapWidth } : undefined,
+            lineSpacing: 6
+        }).setDepth(10)
+
+        this.infoPanelObjects.push(textObject)
+
+        return textObject
+    }
+
+    addInfoButton(x, y, text, onClick, disabled = false) {
+        const button = this.add.text(x, y, text, {
+            fontSize: '14px',
+            backgroundColor: disabled ? '#222222' : '#333333',
+            color: disabled ? '#777777' : '#ffffff',
+            padding: {
+                x: 12,
+                y: 8
+            }
+        }).setDepth(10)
+
+        this.infoPanelObjects.push(button)
+
+        if (!disabled) {
+            button.setInteractive()
+
+            button.on('pointerover', () => {
+                button.setStyle({
+                    backgroundColor: '#555555'
+                })
+            })
+
+            button.on('pointerout', () => {
+                button.setStyle({
+                    backgroundColor: '#333333'
+                })
+            })
+
+            button.on('pointerdown', onClick)
+        }
+
+        return button
+    }
+
+    clearInfoPanel() {
+        this.infoPanelObjects.forEach((object) => {
+            object.destroy()
+        })
+
+        this.infoPanelObjects = []
+    }
+
     showBaseMessage(message, color = '#ffffff') {
-        // Если старое сообщение уже есть — удаляем
         if (this.baseMessageText) {
             this.baseMessageText.destroy()
         }
 
-        this.baseMessageText = this.add.text(440, 610, message, {
-            fontSize: '17px',
-            color: color
-        }).setDepth(10)
+        this.baseMessageText = this.add.text(955, 585, message, {
+            fontSize: '14px',
+            color,
+            wordWrap: {
+                width: 230
+            }
+        }).setDepth(20)
     }
 
     isContractUnlocked(contract) {
@@ -257,116 +531,5 @@ export class OrderBaseScene extends Phaser.Scene {
         })
 
         return 'Требуется: ' + missingTitles.join(', ')
-    }
-
-    drawContractCard(contract, index) {
-        const isCompleted = isContractCompleted(contract.id)
-        const isUnlocked = this.isContractUnlocked(contract)
-        const canStart = canTakeContract() && isUnlocked && !isCompleted
-
-        const x = 430
-        const y = 240 + index * 130
-        const width = 700
-        const height = 115
-
-        const contractPanel = this.add.graphics().setDepth(2)
-
-        contractPanel.fillStyle(isCompleted || !isUnlocked ? 0x101010 : 0x191919, 0.96)
-        contractPanel.fillRoundedRect(x, y, width, height, 16)
-
-        contractPanel.lineStyle(2, 0x555555, 1)
-        contractPanel.strokeRoundedRect(x, y, width, height, 16)
-
-        this.add.text(x + 30, y + 18, contract.title, {
-            fontSize: '22px',
-            color: isUnlocked ? '#ffffff' : '#777777'
-        }).setDepth(3)
-
-        this.add.text(x + 30, y + 50, 'Регион: ' + contract.region, {
-            fontSize: '14px',
-            color: '#aaaaaa'
-        }).setDepth(3)
-
-        this.add.text(x + 30, y + 74, 'Опасность: ' + contract.danger, {
-            fontSize: '14px',
-            color: isUnlocked ? contract.dangerColor : '#777777'
-        }).setDepth(3)
-
-        if (isCompleted) {
-            this.add.text(x + 190, y + 74, 'ВЫПОЛНЕН', {
-                fontSize: '14px',
-                color: '#79ff79'
-            }).setDepth(3)
-        }
-
-        if (!isUnlocked && !isCompleted) {
-            this.add.text(x + 190, y + 74, 'ЗАКРЫТ', {
-                fontSize: '14px',
-                color: '#ff7777'
-            }).setDepth(3)
-        }
-
-        this.add.text(x + 30, y + 96, 'Награда: ' + contract.reward.silverMin + '-' + contract.reward.silverMax + ' серебра, опыт', {
-            fontSize: '13px',
-            color: '#cccccc'
-        }).setDepth(3)
-
-        this.add.text(x + 330, y + 34, isUnlocked ? contract.description[0] : this.getLockedReason(contract), {
-            fontSize: '14px',
-            color: isUnlocked ? '#bbbbbb' : '#ff9999',
-            wordWrap: {
-                width: 320
-            }
-        }).setDepth(3)
-
-        let buttonText = 'ВЗЯТЬ'
-        let buttonColor = '#333333'
-        let textColor = '#ffffff'
-
-        if (isCompleted) {
-            buttonText = 'ВЫПОЛНЕН'
-            buttonColor = '#222222'
-            textColor = '#777777'
-        } else if (!isUnlocked) {
-            buttonText = 'ЗАКРЫТ'
-            buttonColor = '#221111'
-            textColor = '#ff7777'
-        } else if (!canTakeContract()) {
-            buttonText = 'НУЖЕН ОТДЫХ'
-            buttonColor = '#221111'
-            textColor = '#ff7777'
-        }
-
-        const startButton = this.add.text(x + 515, y + 74, buttonText, {
-            fontSize: '17px',
-            backgroundColor: buttonColor,
-            color: textColor,
-            padding: {
-                x: 16,
-                y: 8
-            }
-        }).setDepth(4)
-
-        if (canStart) {
-            startButton.setInteractive()
-
-            startButton.on('pointerover', () => {
-                startButton.setStyle({
-                    backgroundColor: '#555555'
-                })
-            })
-
-            startButton.on('pointerout', () => {
-                startButton.setStyle({
-                    backgroundColor: '#333333'
-                })
-            })
-
-            startButton.on('pointerdown', () => {
-                this.scene.start('ContractTravelScene', {
-                    contractId: contract.id
-                })
-            })
-        }
     }
 }

@@ -1,6 +1,7 @@
 export const REST_COST = 10
 export const BANDAGE_COST = 5
 export const MAX_BANDAGES = 3
+export const INFIRMARY_UPGRADE_COST = 50
 
 const SAVE_KEY = 'orderOfHuntersPlayerState'
 
@@ -20,7 +21,12 @@ export const playerState = {
     bandages: 2,
 
     // Список выполненных контрактов
-    completedContracts: []
+    completedContracts: [],
+
+    // Развитие базы Ордена
+    base: {
+        infirmaryLevel: 0
+    }
 }
 
 // Штрафы от ранений
@@ -70,6 +76,16 @@ export function loadPlayerState() {
         if (typeof playerState.bandages !== 'number') {
             playerState.bandages = 2
         }
+
+        if (!playerState.base) {
+            playerState.base = {
+                infirmaryLevel: 0
+            }
+        }
+
+        if (typeof playerState.base.infirmaryLevel !== 'number') {
+            playerState.base.infirmaryLevel = 0
+        }
     } catch (error) {
         console.error('Ошибка загрузки сохранения:', error)
     }
@@ -114,6 +130,15 @@ export function needsRest() {
     return playerState.hp < playerState.maxHP || playerState.wounds !== 'нет'
 }
 
+export function getRestCost() {
+    // Лазарет 1 уровня снижает цену отдыха
+    if (playerState.base.infirmaryLevel >= 1) {
+        return 5
+    }
+
+    return REST_COST
+}
+
 export function restAtBase() {
     // Если лечиться не нужно
     if (!needsRest()) {
@@ -124,7 +149,9 @@ export function restAtBase() {
     }
 
     // Если не хватает серебра
-    if (playerState.silver < REST_COST) {
+    const restCost = getRestCost()
+
+    if (playerState.silver < restCost) {
         return {
             success: false,
             message: 'Недостаточно серебра для отдыха.'
@@ -132,7 +159,7 @@ export function restAtBase() {
     }
 
     // Оплата отдыха
-    playerState.silver -= REST_COST
+    playerState.silver -= restCost
 
     // Восстановление
     playerState.hp = playerState.maxHP
@@ -172,6 +199,32 @@ export function buyBandageAtBase() {
     return {
         success: true,
         message: 'Бинт добавлен в припасы.'
+    }
+}
+
+export function upgradeInfirmary() {
+    if (playerState.base.infirmaryLevel >= 1) {
+        return {
+            success: false,
+            message: 'Лазарет уже улучшен.'
+        }
+    }
+
+    if (playerState.silver < INFIRMARY_UPGRADE_COST) {
+        return {
+            success: false,
+            message: 'Недостаточно серебра для улучшения Лазарета.'
+        }
+    }
+
+    playerState.silver -= INFIRMARY_UPGRADE_COST
+    playerState.base.infirmaryLevel = 1
+
+    savePlayerState()
+
+    return {
+        success: true,
+        message: 'Лазарет улучшен. Отдых стал дешевле.'
     }
 }
 

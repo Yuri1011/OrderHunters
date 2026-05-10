@@ -57,6 +57,15 @@ export class OrderBaseScene extends Phaser.Scene {
             color: '#999999'
         }).setDepth(3)
 
+        const completedCount = contracts.filter((contract) => {
+            return isContractCompleted(contract.id)
+        }).length
+
+        this.add.text(440, 205, 'Выполнено контрактов: ' + completedCount + ' / ' + contracts.length, {
+            fontSize: '15px',
+            color: '#777777'
+        }).setDepth(3)
+
         // Рисуем карточки контрактов из массива contracts
         contracts.forEach((contract, index) => {
             this.drawContractCard(contract, index)
@@ -218,53 +227,93 @@ export class OrderBaseScene extends Phaser.Scene {
         }).setDepth(10)
     }
 
+    isContractUnlocked(contract) {
+        const requiredContracts = contract.requiredCompletedContracts || []
+
+        return requiredContracts.every((contractId) => {
+            return isContractCompleted(contractId)
+        })
+    }
+
+    getLockedReason(contract) {
+        const requiredContracts = contract.requiredCompletedContracts || []
+
+        if (requiredContracts.length === 0) {
+            return ''
+        }
+
+        const missingContracts = requiredContracts.filter((contractId) => {
+            return !isContractCompleted(contractId)
+        })
+
+        if (missingContracts.length === 0) {
+            return ''
+        }
+
+        const missingTitles = missingContracts.map((contractId) => {
+            const requiredContract = contracts.find((item) => item.id === contractId)
+
+            return requiredContract ? requiredContract.title : contractId
+        })
+
+        return 'Требуется: ' + missingTitles.join(', ')
+    }
+
     drawContractCard(contract, index) {
         const isCompleted = isContractCompleted(contract.id)
-        const canStart = canTakeContract()
+        const isUnlocked = this.isContractUnlocked(contract)
+        const canStart = canTakeContract() && isUnlocked && !isCompleted
 
         const x = 430
-        const y = 240 + index * 180
+        const y = 240 + index * 130
         const width = 700
-        const height = 155
+        const height = 115
 
         const contractPanel = this.add.graphics().setDepth(2)
 
-        contractPanel.fillStyle(isCompleted ? 0x101010 : 0x191919, 0.96)
+        contractPanel.fillStyle(isCompleted || !isUnlocked ? 0x101010 : 0x191919, 0.96)
         contractPanel.fillRoundedRect(x, y, width, height, 16)
 
         contractPanel.lineStyle(2, 0x555555, 1)
         contractPanel.strokeRoundedRect(x, y, width, height, 16)
 
-        this.add.text(x + 30, y + 20, contract.title, {
-            fontSize: '24px',
-            color: '#ffffff'
+        this.add.text(x + 30, y + 18, contract.title, {
+            fontSize: '22px',
+            color: isUnlocked ? '#ffffff' : '#777777'
         }).setDepth(3)
 
-        this.add.text(x + 30, y + 55, 'Регион: ' + contract.region, {
-            fontSize: '15px',
+        this.add.text(x + 30, y + 50, 'Регион: ' + contract.region, {
+            fontSize: '14px',
             color: '#aaaaaa'
         }).setDepth(3)
 
-        this.add.text(x + 30, y + 80, 'Опасность: ' + contract.danger, {
-            fontSize: '15px',
-            color: contract.dangerColor
+        this.add.text(x + 30, y + 74, 'Опасность: ' + contract.danger, {
+            fontSize: '14px',
+            color: isUnlocked ? contract.dangerColor : '#777777'
         }).setDepth(3)
 
         if (isCompleted) {
-            this.add.text(x + 190, y + 80, 'ВЫПОЛНЕН', {
-                fontSize: '15px',
+            this.add.text(x + 190, y + 74, 'ВЫПОЛНЕН', {
+                fontSize: '14px',
                 color: '#79ff79'
             }).setDepth(3)
         }
 
-        this.add.text(x + 30, y + 105, 'Награда: ' + contract.reward.silverMin + '-' + contract.reward.silverMax + ' серебра, опыт', {
-            fontSize: '15px',
+        if (!isUnlocked && !isCompleted) {
+            this.add.text(x + 190, y + 74, 'ЗАКРЫТ', {
+                fontSize: '14px',
+                color: '#ff7777'
+            }).setDepth(3)
+        }
+
+        this.add.text(x + 30, y + 96, 'Награда: ' + contract.reward.silverMin + '-' + contract.reward.silverMax + ' серебра, опыт', {
+            fontSize: '13px',
             color: '#cccccc'
         }).setDepth(3)
 
-        this.add.text(x + 330, y + 55, contract.description[0], {
-            fontSize: '15px',
-            color: '#bbbbbb',
+        this.add.text(x + 330, y + 34, isUnlocked ? contract.description[0] : this.getLockedReason(contract), {
+            fontSize: '14px',
+            color: isUnlocked ? '#bbbbbb' : '#ff9999',
             wordWrap: {
                 width: 320
             }
@@ -278,24 +327,27 @@ export class OrderBaseScene extends Phaser.Scene {
             buttonText = 'ВЫПОЛНЕН'
             buttonColor = '#222222'
             textColor = '#777777'
-        } else if (!canStart) {
+        } else if (!isUnlocked) {
+            buttonText = 'ЗАКРЫТ'
+            buttonColor = '#221111'
+            textColor = '#ff7777'
+        } else if (!canTakeContract()) {
             buttonText = 'НУЖЕН ОТДЫХ'
             buttonColor = '#221111'
             textColor = '#ff7777'
         }
 
-        const startButton = this.add.text(x + 500, y + 105, buttonText, {
-            fontSize: '18px',
+        const startButton = this.add.text(x + 515, y + 74, buttonText, {
+            fontSize: '17px',
             backgroundColor: buttonColor,
             color: textColor,
             padding: {
-                x: 18,
+                x: 16,
                 y: 8
             }
         }).setDepth(4)
 
-        // Нажимать можно только если контракт не выполнен и Рейнар способен идти на задание
-        if (!isCompleted && canStart) {
+        if (canStart) {
             startButton.setInteractive()
 
             startButton.on('pointerover', () => {

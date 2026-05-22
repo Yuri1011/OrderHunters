@@ -1,20 +1,22 @@
 import Phaser from 'phaser'
 import { contracts } from '../data/contracts.js'
 import { baseBuildings, getBaseBuildingById } from '../data/baseBuildings.js'
+import { createBaseSceneLayout } from '../ui/baseSceneLayout.js'
+import { createNavButtonBackground } from '../ui/navButtonBackground.js'
 
 import {
     playerState,
+    savePlayerState,
     isContractCompleted,
-    restAtBase,
-    buyBandageAtBase,
-    getRestCost,
-    upgradeInfirmary,
-    BANDAGE_COST,
-    MAX_BANDAGES,
-    INFIRMARY_UPGRADE_COST,
     canTakeContract,
+    MAX_BANDAGES,
     getEffectiveMaxHP
 } from '../data/playerState.js'
+
+const MAP_ICON_SIZE = 72
+const MAP_ICON_HOVER_SIZE = 82
+const MESSENGER_ASPECT = 805 / 1626
+const MESSENGER_MAX_HEIGHT = 606
 
 export class OrderBaseScene extends Phaser.Scene {
     constructor() {
@@ -22,7 +24,23 @@ export class OrderBaseScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('baseBg', '/assets/backgrounds/base-bg.png')
+        this.load.image('hunter_base', '/assets/backgrounds/base-bg.png')
+        this.load.image('parchment_panel', '/assets/ui/panel-building-card.png')
+        this.load.image('ui_messenger_order', '/assets/ui/vwstovoi.webp')
+        this.load.image('ui_close_x', '/assets/ui/close-x.webp')
+        this.load.image('ui_player_panel_frame', '/assets/ui/player-panel-frame.webp')
+        this.load.image('ui_top_panel_frame', '/assets/ui/top-panel-frame.webp')
+        this.load.image('ui_nav_button', '/assets/ui/nav-button.webp')
+
+        // Иконки локаций базы
+        this.load.image('icon_forge', '/assets/icons/base/forge.png')
+        this.load.image('icon_council', '/assets/icons/base/council.png')
+        this.load.image('icon_infirmary', '/assets/icons/base/infirmary.png')
+        this.load.image('icon_quarters', '/assets/icons/base/apartment.png')
+        this.load.image('icon_barracks', '/assets/icons/base/barracks.png')
+        this.load.image('icon_rest', '/assets/icons/base/rest.png')
+        this.load.image('icon_contracts', '/assets/icons/base/contracts.png')
+        this.load.image('icon_training', '/assets/icons/base/training.png')
     }
 
     init(data) {
@@ -33,34 +51,27 @@ export class OrderBaseScene extends Phaser.Scene {
         this.infoPanelObjects = []
         this.baseMessageText = null
         this.hoverLabel = null
+        this.hotspotObjects = []
+        this.locationIcons = {}
+        this.activeLocationId = null
+        this.locationPanel = null
+        this.locationPanelType = null
+        this.locationPanelTitle = null
+        this.locationPanelSubtitle = null
+        this.locationPanelBody = null
+        this.locationPanelActionObjects = []
+        this.baseImage = null
+        this.mapImage = null
+        // Объекты доски контрактов, чтобы потом можно было их удалить
+        this.contractBoardObjects = []
+        // Объекты нижнего меню, чтобы можно было перерисовывать панель
+        this.bottomNavObjects = []
+        this.messengerPanel = null
 
-        // Единая сетка экрана: панели вокруг, база в центре
-        this.layout = {
-            topX: 20,
-            topY: 15,
-            topW: 1240,
-            topH: 58,
+        // Нижнее меню не держит активную вкладку: кнопки выделяются только при наведении
+        this.activeNavId = null
 
-            leftX: 20,
-            leftY: 90,
-            leftW: 220,
-            leftH: 540,
-
-            baseX: 260,
-            baseY: 90,
-            baseW: 690,
-            baseH: 388, // 16:9, чтобы фон не искажался
-
-            rightX: 970,
-            rightY: 90,
-            rightW: 290,
-            rightH: 540,
-
-            bottomX: 260,
-            bottomY: 645,
-            bottomW: 690,
-            bottomH: 55
-        }
+        this.layout = createBaseSceneLayout(this.scale)
 
         this.cameras.main.setBackgroundColor('#050505')
 
@@ -68,17 +79,22 @@ export class OrderBaseScene extends Phaser.Scene {
         this.drawTopBar()
         this.drawBaseView()
         this.drawPlayerPanel()
+        this.createLocationPanel()
         this.drawHotspots()
         this.drawBottomNav()
 
-        this.showBuildingInfo(this.selectedBuildingId)
+        // Если есть новый доступный контракт — Вестовой сообщает о нём
+        this.showContractMessengerIfNeeded()
     }
 
     drawScreenBackground() {
-        this.add.rectangle(640, 360, 1280, 720, 0x050505).setDepth(0)
+        const screenW = this.scale.width
+        const screenH = this.scale.height
+
+        this.add.rectangle(screenW / 2, screenH / 2, screenW, screenH, 0x050505).setDepth(0)
 
         // Едва заметный общий фон, чтобы экран не был пустым вокруг центральной базы
-        this.add.rectangle(640, 360, 1240, 690, 0x0b0b0b)
+        this.add.rectangle(screenW / 2, screenH / 2, screenW - 40, screenH - 30, 0x0b0b0b)
             .setStrokeStyle(1, 0x202020)
             .setDepth(1)
     }
@@ -86,30 +102,22 @@ export class OrderBaseScene extends Phaser.Scene {
     drawTopBar() {
         const { topX, topY, topW, topH } = this.layout
 
-        const panel = this.add.graphics().setDepth(5)
+        this.add.image(topX, topY, 'ui_top_panel_frame')
+            .setOrigin(0, 0)
+            .setDisplaySize(topW, topH)
+            .setDepth(5)
 
-        panel.fillStyle(0x080808, 0.92)
-        panel.fillRoundedRect(topX, topY, topW, topH, 10)
-
-        panel.lineStyle(1, 0x333333, 1)
-        panel.strokeRoundedRect(topX, topY, topW, topH, 10)
-
-        this.add.text(45, 32, 'ОРДЕН ОХОТНИКОВ', {
-            fontSize: '24px',
-            color: '#ffffff'
-        }).setDepth(6)
-
-        this.add.text(330, 36, 'Серебро: ' + playerState.silver, {
+        this.add.text(topX + 92, topY + 24, 'Серебро: ' + playerState.silver, {
             fontSize: '16px',
             color: '#cccccc'
         }).setDepth(6)
 
-        this.add.text(500, 36, 'Бинты: ' + playerState.bandages + ' / ' + MAX_BANDAGES, {
+        this.add.text(topX + 270, topY + 24, 'Бинты: ' + playerState.bandages + ' / ' + MAX_BANDAGES, {
             fontSize: '16px',
             color: '#cccccc'
         }).setDepth(6)
 
-        this.add.text(680, 36, 'Опыт: ' + playerState.exp, {
+        this.add.text(topX + 455, topY + 24, 'Опыт: ' + playerState.exp, {
             fontSize: '16px',
             color: '#cccccc'
         }).setDepth(6)
@@ -118,44 +126,49 @@ export class OrderBaseScene extends Phaser.Scene {
             return isContractCompleted(contract.id)
         }).length
 
-        this.add.text(880, 36, 'Контракты: ' + completedCount + ' / ' + contracts.length, {
+        this.add.text(topX + 650, topY + 24, 'Контракты: ' + completedCount + ' / ' + contracts.length, {
             fontSize: '16px',
             color: '#999999'
         }).setDepth(6)
     }
 
     drawBaseView() {
-        const { baseX, baseY, baseW, baseH } = this.layout
+        const { mapX, mapY, mapW, mapH } = this.layout
 
-        // Рамка центральной игровой области
-        const frame = this.add.graphics().setDepth(3)
+        this.baseImage = this.add.image(mapX, mapY, 'hunter_base')
+            .setOrigin(0, 0)
+            .setDepth(1)
 
-        frame.fillStyle(0x000000, 0.95)
-        frame.fillRoundedRect(baseX - 8, baseY - 8, baseW + 16, baseH + 16, 10)
+        this.mapImage = this.baseImage
 
-        frame.lineStyle(2, 0x343434, 1)
-        frame.strokeRoundedRect(baseX - 8, baseY - 8, baseW + 16, baseH + 16, 10)
+        // Вписываем изображение в область карты
+        const scaleX = mapW / this.baseImage.width
+        const scaleY = mapH / this.baseImage.height
 
-        // Чистый фон базы. Он больше не перекрывается панелями.
-        this.add.image(baseX + baseW / 2, baseY + baseH / 2, 'baseBg')
-            .setDisplaySize(baseW, baseH)
-            .setDepth(4)
+        // cover, чтобы не было пустот внутри рамки
+        const imageScale = Math.max(scaleX, scaleY)
+        this.baseImage.setScale(imageScale)
 
-        // Лёгкое затемнение только внутри окна базы
-        this.add.rectangle(baseX + baseW / 2, baseY + baseH / 2, baseW, baseH, 0x000000, 0.08)
+        const mapMaskShape = this.make.graphics({ x: 0, y: 0, add: false })
+        mapMaskShape.fillStyle(0xffffff)
+        mapMaskShape.fillRect(mapX, mapY, mapW, mapH)
+
+        const mapMask = mapMaskShape.createGeometryMask()
+        this.baseImage.setMask(mapMask)
+
+        this.add.rectangle(mapX, mapY, mapW, mapH, 0x000000, 0.06)
+            .setOrigin(0, 0)
             .setDepth(5)
+
     }
 
     drawPlayerPanel() {
         const { leftX, leftY, leftW, leftH } = this.layout
 
-        const panel = this.add.graphics().setDepth(5)
-
-        panel.fillStyle(0x080808, 0.9)
-        panel.fillRoundedRect(leftX, leftY, leftW, leftH, 12)
-
-        panel.lineStyle(1, 0x3f3f3f, 1)
-        panel.strokeRoundedRect(leftX, leftY, leftW, leftH, 12)
+        this.add.image(leftX, leftY, 'ui_player_panel_frame')
+            .setOrigin(0, 0)
+            .setDisplaySize(leftW, leftH)
+            .setDepth(5)
 
         this.add.text(leftX + 25, leftY + 35, playerState.name, {
             fontSize: '20px',
@@ -208,112 +221,72 @@ export class OrderBaseScene extends Phaser.Scene {
     }
 
     drawHotspots() {
-        baseBuildings.forEach((building) => {
-            const rect = this.getBuildingRect(building)
-            const isSelected = building.id === this.selectedBuildingId
+        // Удаляем старые иконки/зоны перед перерисовкой
+        this.hotspotObjects.forEach((object) => {
+            object.destroy()
+        })
 
-            // Невидимая зона клика по зданию
-            const zone = this.add.rectangle(
-                rect.x,
-                rect.y,
-                rect.width,
-                rect.height,
-                0x000000,
-                0.001
-            )
-                .setInteractive()
-                .setDepth(12)
+        this.hotspotObjects = []
+        this.locationIcons = {}
+        this.hideHoverLabel()
 
-            zone.on('pointerover', () => {
-                this.drawBuildingHighlight(rect, building, true)
-                this.showHoverLabel(building, rect)
-            })
+        const { mapX, mapY, mapW, mapH } = this.layout
 
-            zone.on('pointerout', () => {
-                this.hideHoverLabel()
-                this.redrawSelectedHighlight()
-            })
+        baseBuildings.forEach((location) => {
+            const iconX = mapX + location.x * mapW
+            const iconY = mapY + location.y * mapH
 
-            zone.on('pointerdown', () => {
-                this.scene.restart({
-                    selectedBuildingId: building.id
+            const icon = this.add.image(iconX, iconY, location.icon)
+                .setDisplaySize(MAP_ICON_SIZE, MAP_ICON_SIZE)
+                .setDepth(30)
+                .setInteractive({ useHandCursor: true })
+
+            icon.on('pointerover', () => {
+                icon.setDisplaySize(MAP_ICON_HOVER_SIZE, MAP_ICON_HOVER_SIZE)
+                this.showHoverLabel(location, {
+                    x: iconX,
+                    y: iconY
                 })
             })
 
-            // Постоянная маленькая метка локации
-            this.drawBuildingIcon(building, rect, isSelected)
+            icon.on('pointerout', () => {
+                icon.setDisplaySize(MAP_ICON_SIZE, MAP_ICON_SIZE)
+                this.hideHoverLabel()
+            })
+
+            icon.on('pointerdown', () => {
+                // Повторный клик по открытой локации закрывает её окно
+                if (this.activeLocationId === location.id) {
+                    this.closeLocationPanel()
+                    this.closeContractBoard()
+                    this.activeLocationId = null
+                    return
+                }
+
+                // Сначала открываем карточку доски контрактов справа
+                if (location.id === 'contracts') {
+                    this.closeContractBoard()
+                    this.openLocationPanel(location)
+                    return
+                }
+
+                // Остальные здания
+                this.closeContractBoard()
+                this.openLocationPanel(location)
+            })
+
+            this.locationIcons[location.id] = icon
+            this.hotspotObjects.push(icon)
         })
-
-        this.redrawSelectedHighlight()
-    }
-
-    getBuildingRect(building) {
-        const { baseX, baseY, baseW, baseH } = this.layout
-
-        return {
-            x: baseX + building.xPercent * baseW,
-            y: baseY + building.yPercent * baseH,
-            width: building.widthPercent * baseW,
-            height: building.heightPercent * baseH
-        }
-    }
-
-    drawBuildingIcon(building, rect, isSelected) {
-        const circleColor = isSelected ? 0xc49a4a : 0x111111
-        const textColor = isSelected ? '#1a1a1a' : '#e0d0aa'
-
-        const iconCircle = this.add.circle(rect.x, rect.y, isSelected ? 18 : 15, circleColor, isSelected ? 0.95 : 0.85)
-            .setStrokeStyle(2, isSelected ? 0xffdd99 : 0x6a5630)
-            .setDepth(14)
-
-        const iconText = this.add.text(rect.x, rect.y - 1, building.icon, {
-            fontSize: building.icon.length > 1 ? '11px' : '15px',
-            color: textColor
-        })
-            .setOrigin(0.5)
-            .setDepth(15)
-
-        return {
-            iconCircle,
-            iconText
-        }
-    }
-
-    drawBuildingHighlight(rect, building, isHover = false) {
-        if (this.highlightBox) {
-            this.highlightBox.destroy()
-            this.highlightBox = null
-        }
-
-        const color = isHover ? 0xffdd99 : 0xc49a4a
-        const alpha = isHover ? 0.16 : 0.1
-
-        this.highlightBox = this.add.rectangle(rect.x, rect.y, rect.width, rect.height, color, alpha)
-            .setStrokeStyle(2, color, 0.9)
-            .setDepth(13)
-    }
-
-    redrawSelectedHighlight() {
-        if (this.highlightBox) {
-            this.highlightBox.destroy()
-            this.highlightBox = null
-        }
-
-        const selectedBuilding = getBaseBuildingById(this.selectedBuildingId)
-
-        if (!selectedBuilding) return
-
-        const rect = this.getBuildingRect(selectedBuilding)
-
-        this.drawBuildingHighlight(rect, selectedBuilding, false)
     }
 
     showHoverLabel(building, rect) {
         this.hideHoverLabel()
 
-        this.hoverLabel = this.add.text(rect.x, rect.y - rect.height / 2 - 18, building.title, {
+        this.hoverLabel = this.add.text(rect.x, rect.y - 42, building.title, {
+            fontFamily: 'Georgia, "Times New Roman", serif',
             fontSize: '14px',
-            color: '#ffdd99',
+            color: '#f0e2cb',
             backgroundColor: '#111111',
             padding: {
                 x: 9,
@@ -321,7 +294,7 @@ export class OrderBaseScene extends Phaser.Scene {
             }
         })
             .setOrigin(0.5)
-            .setDepth(30)
+            .setDepth(60)
     }
 
     hideHoverLabel() {
@@ -332,351 +305,854 @@ export class OrderBaseScene extends Phaser.Scene {
     }
 
     drawBottomNav() {
+        // Удаляем старые элементы нижнего меню перед новой отрисовкой
+        this.bottomNavObjects.forEach((object) => {
+            object.destroy()
+        })
+
+        this.bottomNavObjects = []
+
         const { bottomX, bottomY, bottomW, bottomH } = this.layout
 
-        const panel = this.add.graphics().setDepth(5)
+        const panel = this.add.graphics().setDepth(40)
 
-        panel.fillStyle(0x080808, 0.92)
+        // Общая тёмная подложка нижней панели
+        panel.fillStyle(0x111211, 0.96)
         panel.fillRoundedRect(bottomX, bottomY, bottomW, bottomH, 10)
 
-        panel.lineStyle(1, 0x333333, 1)
+        panel.lineStyle(1, 0x47443d, 1)
         panel.strokeRoundedRect(bottomX, bottomY, bottomW, bottomH, 10)
 
-        const items = [
-            'КОНТРАКТЫ',
-            'ОХОТНИКИ',
-            'ИНВЕНТАРЬ',
-            'КАРТА',
-            'УЛУЧШЕНИЯ'
+        this.bottomNavObjects.push(panel)
+
+        const navItems = [
+            {
+                id: 'contracts',
+                label: 'КОНТРАКТЫ',
+                icon: 'icon_contracts',
+                badge: false
+            },
+            {
+                id: 'hunters',
+                label: 'ОХОТНИКИ',
+                icon: 'icon_barracks',
+                badge: false
+            },
+            {
+                id: 'inventory',
+                label: 'ИНВЕНТАРЬ',
+                icon: 'icon_quarters',
+                badge: false
+            },
+            {
+                id: 'map',
+                label: 'КАРТА',
+                icon: 'icon_council',
+                badge: false
+            },
+            {
+                id: 'upgrades',
+                label: 'УЛУЧШЕНИЯ',
+                icon: 'icon_forge',
+                badge: false
+            }
         ]
 
-        items.forEach((item, index) => {
-            this.add.text(bottomX + 45 + index * 125, bottomY + 18, item, {
-                fontSize: '14px',
-                color: index === 0 ? '#ffffff' : '#888888'
-            }).setDepth(6)
+        const itemW = bottomW / navItems.length
+
+        navItems.forEach((item, index) => {
+            const x = bottomX + itemW * index
+            const y = bottomY
+
+            this.drawBottomNavButton(item, x, y, itemW, bottomH)
         })
+    }
+
+    drawBottomNavButton(item, x, y, w, h) {
+        const isActive = false
+
+        const buttonBg = createNavButtonBackground(this, x, y, w, h, 41)
+
+        const drawButtonBg = (isHover = false) => {
+            buttonBg.setState(isHover)
+        }
+
+        drawButtonBg(false)
+
+        this.bottomNavObjects.push(...buttonBg.parts)
+
+        // Текст кнопки
+        const text = this.add.text(x + w / 2, y + h / 2 + 1, item.label, {
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: '14px',
+            color: isActive ? '#f3e4c8' : '#aaa394'
+        })
+            .setOrigin(0.5)
+            .setDepth(42)
+
+        this.bottomNavObjects.push(text)
+
+        // Красная точка-уведомление
+        if (item.badge) {
+            const badge = this.add.circle(x + 18, y + 14, 6, 0x8f1d16, 1)
+                .setStrokeStyle(1, 0xffb0a0, 0.85)
+                .setDepth(44)
+
+            const badgeText = this.add.text(x + 18, y + 13, '!', {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '10px',
+                color: '#ffffff'
+            })
+                .setOrigin(0.5)
+                .setDepth(45)
+
+            this.bottomNavObjects.push(badge, badgeText)
+        }
+
+        // Интерактивная зона всей кнопки
+        const hitZone = this.add.zone(x + 4, y + 5, w - 8, h - 10)
+            .setOrigin(0, 0)
+            .setDepth(46)
+            .setInteractive({ useHandCursor: true })
+
+        hitZone.on('pointerover', () => {
+            drawButtonBg(true)
+
+            if (!isActive) {
+                text.setColor('#e0d2b8')
+            }
+        })
+
+        hitZone.on('pointerout', () => {
+            drawButtonBg(false)
+
+            if (!isActive) {
+                text.setColor('#aaa394')
+            }
+        })
+
+        hitZone.on('pointerdown', () => {
+            this.handleBottomNavClick(item.id)
+        })
+
+        this.bottomNavObjects.push(hitZone)
+    }
+
+    handleBottomNavClick(navId) {
+        this.activeNavId = null
+        this.drawBottomNav()
+
+        // При переходе по нижнему меню закрываем большие окна
+        this.closeContractBoard()
+
+        if (navId === 'contracts') {
+            // Из нижнего меню сразу открываем большую доску контрактов
+            const contractsBuilding = getBaseBuildingById('contracts')
+            this.openContractBoard(contractsBuilding)
+            return
+        }
+
+        if (navId === 'hunters') {
+            this.showBaseMessage('Раздел охотников пока в разработке.')
+            return
+        }
+
+        if (navId === 'inventory') {
+            this.showBaseMessage('Инвентарь пока в разработке.')
+            return
+        }
+
+        if (navId === 'map') {
+            this.showBaseMessage('Карта Морвальда пока в разработке.')
+            return
+        }
+
+        if (navId === 'upgrades') {
+            this.showBaseMessage('Улучшения базы пока в разработке.')
+        }
+    }
+
+    showBaseMessage(message) {
+        if (this.baseMessageText) {
+            this.baseMessageText.destroy()
+            this.baseMessageText = null
+        }
+
+        const { mapX, mapY, mapW } = this.layout
+
+        this.baseMessageText = this.add.text(mapX + mapW / 2, mapY + 28, message, {
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: '16px',
+            color: '#f0e2cb',
+            backgroundColor: '#111111',
+            padding: {
+                x: 14,
+                y: 8
+            }
+        })
+            .setOrigin(0.5, 0)
+            .setDepth(90)
+
+        // Сообщение само исчезает через 2 секунды
+        this.time.delayedCall(2000, () => {
+            if (this.baseMessageText) {
+                this.baseMessageText.destroy()
+                this.baseMessageText = null
+            }
+        })
+    }
+
+    hasAvailableContracts() {
+        return contracts.some((contract) => {
+            const completed = isContractCompleted(contract.id)
+            const unlocked = this.isContractUnlocked(contract)
+
+            return unlocked && !completed && canTakeContract()
+        })
+    }
+
+    getNewContractForNotification() {
+        // Ищем первый контракт, который:
+        // 1. открыт игроку
+        // 2. ещё не выполнен
+        // 3. ещё не был показан через Вестового
+        // 4. может быть взят сейчас
+        return contracts.find((contract) => {
+            const completed = isContractCompleted(contract.id)
+            const unlocked = this.isContractUnlocked(contract)
+            const alreadyViewed = playerState.viewedContracts.includes(contract.id)
+
+            return unlocked && !completed && !alreadyViewed && canTakeContract()
+        })
+    }
+
+    showContractMessengerIfNeeded() {
+        const newContract = this.getNewContractForNotification()
+
+        if (!newContract) return
+
+        this.showContractMessenger(newContract)
+    }
+
+    showContractMessenger(contract) {
+        // Закрываем другие панели
+        this.closeLocationPanel()
+        this.closeContractBoard()
+
+        // Если Вестовой уже есть на экране — удаляем
+        this.hideMessengerPanel()
+
+        const { mapX, mapY, mapW, mapH } = this.layout
+
+        // Размер и позиция окна Вестового
+        let panelH = Math.min(MESSENGER_MAX_HEIGHT, mapH - 80)
+        let panelW = Math.round(panelH * MESSENGER_ASPECT)
+
+        if (panelW > mapW - 96) {
+            panelW = mapW - 96
+            panelH = Math.round(panelW / MESSENGER_ASPECT)
+        }
+
+        const panelX = mapX + mapW / 2
+        const panelY = mapY + mapH / 2
+
+        this.messengerPanel = this.add.container(0, 0)
+        this.messengerPanel.setDepth(2500)
+
+        const blocker = this.add.rectangle(mapX, mapY, mapW, mapH, 0x000000, 0.46)
+            .setOrigin(0, 0)
+            .setInteractive({ useHandCursor: false })
+
+        // Само изображение Вестового
+        const messengerImage = this.add.image(panelX, panelY, 'ui_messenger_order')
+            .setDisplaySize(panelW, panelH)
+
+        // Заголовок над головой персонажа
+        const roleText = this.add.text(panelX, panelY - panelH * 0.36, 'ВЕСТОВОЙ ОРДЕНА', {
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: '12px',
+            color: '#8b3f28',
+            align: 'center'
+        }).setOrigin(0.5)
+
+        const titleText = this.add.text(panelX, panelY + panelH * 0.22, 'Есть работа', {
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: '24px',
+            color: '#2b1a10',
+            align: 'center'
+        }).setOrigin(0.5)
+
+        const bodyText = this.add.text(panelX, panelY + panelH * 0.30,
+            'На доске появился новый контракт.\n' +
+            'Загляни, как будет минутка.',
+            {
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontSize: '15px',
+                color: '#3a2618',
+                align: 'center',
+                lineSpacing: 8,
+                wordWrap: { width: panelW * 0.72 }
+            }
+        ).setOrigin(0.5)
+
+        const closeSize = 42
+        const closeX = panelX + panelW / 2 - closeSize - 10
+        const closeY = panelY - panelH / 2 + 14
+        const closeButton = this.add.image(closeX + closeSize / 2, closeY + closeSize / 2, 'ui_close_x')
+            .setDisplaySize(closeSize, closeSize)
+
+        const closeHitZone = this.add.zone(closeX, closeY, closeSize, closeSize)
+            .setOrigin(0, 0)
+            .setInteractive({ useHandCursor: true })
+
+        closeHitZone.on('pointerover', () => {
+            closeButton.setDisplaySize(closeSize + 4, closeSize + 4)
+            closeButton.setAlpha(1)
+        })
+
+        closeHitZone.on('pointerout', () => {
+            closeButton.setDisplaySize(closeSize, closeSize)
+            closeButton.setAlpha(0.92)
+        })
+
+        closeHitZone.on('pointerdown', (pointer, localX, localY, event) => {
+            event.stopPropagation()
+            this.dismissMessengerContract(contract)
+        })
+
+        this.messengerPanel.add([
+            blocker,
+            messengerImage,
+            roleText,
+            titleText,
+            bodyText,
+            closeButton,
+            closeHitZone
+        ])
+    }
+
+    dismissMessengerContract(contract) {
+        if (contract && !playerState.viewedContracts.includes(contract.id)) {
+            playerState.viewedContracts.push(contract.id)
+            savePlayerState()
+        }
+
+        this.hideMessengerPanel()
+    }
+
+    hideMessengerPanel() {
+        if (this.messengerPanel) {
+            this.messengerPanel.destroy(true)
+            this.messengerPanel = null
+        }
+    }
+
+    markVisibleContractsAsViewed() {
+        let changed = false
+
+        contracts.forEach((contract) => {
+            const completed = isContractCompleted(contract.id)
+            const unlocked = this.isContractUnlocked(contract)
+            const alreadyViewed = playerState.viewedContracts.includes(contract.id)
+
+            // Просмотренным считаем только тот контракт, который реально доступен игроку
+            if (unlocked && !completed && !alreadyViewed) {
+                playerState.viewedContracts.push(contract.id)
+                changed = true
+            }
+        })
+
+        if (changed) {
+            savePlayerState()
+        }
+    }
+
+    createLocationPanel() {
+        const {
+            mapX,
+            mapY,
+            mapW,
+            mapH,
+            locationPanelX,
+            locationPanelY,
+            locationPanelW,
+            locationPanelH
+        } = this.layout
+
+        this.locationPanel = this.add.container(0, 0)
+            .setDepth(2400)
+            .setVisible(false)
+
+        const blocker = this.add.rectangle(mapX, mapY, mapW, mapH, 0x000000, 0.46)
+            .setOrigin(0, 0)
+            .setInteractive({ useHandCursor: false })
+
+        const parchment = this.add.image(locationPanelX, locationPanelY, 'parchment_panel')
+            .setOrigin(0, 0)
+            .setDisplaySize(locationPanelW, locationPanelH)
+
+        this.locationPanel.add(blocker)
+        this.locationPanel.add(parchment)
+
+        const closeSize = 42
+        const closeX = locationPanelX + locationPanelW - closeSize - 14
+        const closeY = locationPanelY + 14
+        const closeButton = this.add.image(closeX + closeSize / 2, closeY + closeSize / 2, 'ui_close_x')
+            .setDisplaySize(closeSize, closeSize)
+
+        const closeHitZone = this.add.zone(closeX, closeY, closeSize, closeSize)
+            .setOrigin(0, 0)
+            .setInteractive({ useHandCursor: true })
+
+        closeHitZone.on('pointerover', () => {
+            closeButton.setDisplaySize(closeSize + 4, closeSize + 4)
+            closeButton.setAlpha(1)
+        })
+
+        closeHitZone.on('pointerout', () => {
+            closeButton.setDisplaySize(closeSize, closeSize)
+            closeButton.setAlpha(0.92)
+        })
+
+        closeHitZone.on('pointerdown', (pointer, localX, localY, event) => {
+            event.stopPropagation()
+            this.closeLocationPanel()
+        })
+
+        this.locationPanel.add(closeButton)
+        this.locationPanel.add(closeHitZone)
+
+        // Верхний маленький тип локации
+        this.locationPanelType = this.add.text(locationPanelX + 34, locationPanelY + 30, '', {
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: '#7b3d25'
+        })
+
+        this.locationPanel.add(this.locationPanelType)
+
+        // Название
+        this.locationPanelTitle = this.add.text(locationPanelX + 34, locationPanelY + 74, '', {
+            fontFamily: 'serif',
+            fontSize: '24px',
+            color: '#2b1b12',
+            wordWrap: {
+                width: locationPanelW - 68
+            }
+        })
+
+        this.locationPanel.add(this.locationPanelTitle)
+
+        // Подзаголовок
+        this.locationPanelSubtitle = this.add.text(locationPanelX + 34, locationPanelY + 136, '', {
+            fontFamily: 'serif',
+            fontSize: '16px',
+            color: '#5a4332',
+            wordWrap: {
+                width: locationPanelW - 68
+            }
+        })
+
+        this.locationPanel.add(this.locationPanelSubtitle)
+
+        // Основной текст
+        this.locationPanelBody = this.add.text(locationPanelX + 34, locationPanelY + 188, '', {
+            fontFamily: 'serif',
+            fontSize: '16px',
+            color: '#3a2a1f',
+            lineSpacing: 8,
+            wordWrap: {
+                width: locationPanelW - 68
+            }
+        })
+
+        this.locationPanel.add(this.locationPanelBody)
     }
 
     showBuildingInfo(buildingId) {
-        this.clearInfoPanel()
+        const location = getBaseBuildingById(buildingId)
 
-        const building = getBaseBuildingById(buildingId)
+        if (!location) return
 
-        if (!building) return
+        this.openLocationPanel(location)
+    }
 
-        this.drawInfoPanelFrame(building.title, building.subtitle)
+    openLocationPanel(location) {
+        this.hideMessengerPanel()
 
-        if (buildingId === 'contracts') {
-            this.drawContractsInfo()
-            return
-        }
+        if (!location) return
 
-        if (buildingId === 'infirmary') {
-            this.drawInfirmaryInfo()
-            return
-        }
+        this.clearLocationPanelActions()
 
-        if (buildingId === 'apartment') {
-            this.drawApartmentInfo()
-            return
-        }
+        this.selectedBuildingId = location.id
+        this.activeLocationId = location.id
 
-        if (buildingId === 'rest') {
-            this.drawRestInfo()
-            return
-        }
+        this.locationPanel.setVisible(true)
 
-        if (buildingId === 'forge') {
-            this.drawPlaceholderInfo(
-                'Кузница',
-                'Здесь позже появятся улучшения оружия, брони и снаряжения охотников.'
-            )
-            return
-        }
+        this.locationPanelType.setText(this.getLocationType(location.id))
+        this.locationPanelTitle.setText(location.title)
+        this.locationPanelSubtitle.setText(location.subtitle)
+        this.locationPanelBody.setText(this.getLocationDescription(location.id))
 
-        if (buildingId === 'barracks') {
-            this.drawPlaceholderInfo(
-                'Казармы',
-                'Здесь позже появится управление отрядом, найм и подготовка охотников.'
-            )
-            return
-        }
-
-        if (buildingId === 'training') {
-            this.drawPlaceholderInfo(
-                'Тренировочный двор',
-                'Здесь позже появятся навыки, боевые черты и тренировки охотников.'
-            )
-            return
-        }
-
-        if (buildingId === 'council') {
-            this.drawPlaceholderInfo(
-                'Совет Ордена',
-                'Здесь позже появятся решения Совета, репутация и крупные сюжетные выборы.'
-            )
+        if (location.id === 'contracts') {
+            this.addContractPanelButton(location)
         }
     }
 
-    drawInfoPanelFrame(title, subtitle) {
-        const { rightX, rightY, rightW, rightH } = this.layout
+    closeLocationPanel() {
+        this.activeLocationId = null
 
-        const panel = this.add.graphics().setDepth(20)
+        this.clearLocationPanelActions()
 
-        panel.fillStyle(0x080808, 0.92)
-        panel.fillRoundedRect(rightX, rightY, rightW, rightH, 12)
+        if (this.locationPanel) {
+            this.locationPanel.setVisible(false)
+        }
 
-        panel.lineStyle(1, 0x444444, 1)
-        panel.strokeRoundedRect(rightX, rightY, rightW, rightH, 12)
-
-        this.infoPanelObjects.push(panel)
-
-        this.addInfoText(rightX + 25, rightY + 30, title, 22, '#ffffff')
-        this.addInfoText(rightX + 25, rightY + 64, subtitle, 14, '#999999')
+        this.closeContractBoard()
     }
 
-    drawContractsInfo() {
-        const { rightX, rightY } = this.layout
+    addContractPanelButton(location) {
+        const { locationPanelX, locationPanelY, locationPanelW, locationPanelH } = this.layout
+        const buttonX = locationPanelX + 34
+        const buttonY = locationPanelY + locationPanelH - 78
+        const buttonW = locationPanelW - 68
+        const buttonH = 46
 
-        this.addInfoText(rightX + 25, rightY + 112, 'Задания Ордена', 17, '#ffffff')
+        const buttonBg = this.add.graphics()
+        const drawButton = (isHover = false) => {
+            buttonBg.clear()
+            buttonBg.fillStyle(isHover ? 0x5a3520 : 0x3a2418, 0.96)
+            buttonBg.fillRoundedRect(buttonX, buttonY, buttonW, buttonH, 8)
+            buttonBg.lineStyle(1, isHover ? 0xd3ae73 : 0x8a6843, 1)
+            buttonBg.strokeRoundedRect(buttonX, buttonY, buttonW, buttonH, 8)
+        }
+
+        drawButton()
+
+        const buttonText = this.add.text(buttonX + buttonW / 2, buttonY + buttonH / 2, 'КОНТРАКТЫ', {
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: '15px',
+            color: '#f4ead8'
+        }).setOrigin(0.5)
+
+        const buttonHitZone = this.add.zone(buttonX, buttonY, buttonW, buttonH)
+            .setOrigin(0, 0)
+            .setInteractive({ useHandCursor: true })
+
+        buttonHitZone.on('pointerover', () => {
+            drawButton(true)
+            buttonText.setColor('#ffffff')
+        })
+
+        buttonHitZone.on('pointerout', () => {
+            drawButton(false)
+            buttonText.setColor('#f4ead8')
+        })
+
+        buttonHitZone.on('pointerdown', (pointer, localX, localY, event) => {
+            event.stopPropagation()
+            this.openContractBoard(location)
+        })
+
+        this.locationPanel.add(buttonBg)
+        this.locationPanel.add(buttonText)
+        this.locationPanel.add(buttonHitZone)
+
+        this.locationPanelActionObjects.push(buttonBg, buttonText, buttonHitZone)
+    }
+
+    clearLocationPanelActions() {
+        this.locationPanelActionObjects.forEach((object) => {
+            object.destroy()
+        })
+
+        this.locationPanelActionObjects = []
+    }
+
+    getLocationType(id) {
+        const types = {
+            forge: 'КУЗНИЦА',
+            council: 'СОВЕТ',
+            infirmary: 'ЛАЗАРЕТ',
+            barracks: 'КАЗАРМЫ',
+            quarters: 'ОХОТНИК',
+            rest: 'ОТДЫХ',
+            contracts: 'КОНТРАКТЫ',
+            training: 'ТРЕНИРОВКА'
+        }
+
+        return types[id] || ''
+    }
+
+    getLocationDescription(id) {
+        const descriptions = {
+            forge: 'Здесь можно улучшать оружие, броню и снаряжение охотников.',
+            council: 'Здесь позже появятся решения Совета, репутация и крупные сюжетные выборы.',
+            infirmary: 'Здесь лечат раны, снимают последствия контрактов и восстанавливают охотников.',
+            barracks: 'Здесь находятся охотники Ордена. Позже здесь можно будет собирать отряд.',
+            quarters: 'HP: ' + playerState.hp + ' / ' + getEffectiveMaxHP() +
+                '\nРаны: ' + playerState.wounds +
+                '\nОпыт: ' + playerState.exp +
+                '\nСеребро: ' + playerState.silver +
+                '\n\nПозже здесь появятся дневник, снаряжение и личные решения.',
+            rest: 'Здесь охотники отдыхают после контрактов и восстанавливают силы.',
+            contracts: 'Здесь можно выбрать контракт, принять задание и отправиться в путь.',
+            training: 'Здесь охотники тренируются и улучшают боевые навыки.'
+        }
+
+        return descriptions[id] || ''
+    }
+
+    openContractBoard(location) {
+        this.scene.start('ContractBoardScene')
+        return
+
+        // старый код ниже пока не трогаем
+
+        // Игрок открыл доску — новые контракты считаем просмотренными
+        this.markVisibleContractsAsViewed()
+
+        this.hideMessengerPanel()
+
+        this.closeLocationPanel()
+        this.closeContractBoard()
+
+        this.selectedBuildingId = location.id
+        this.activeLocationId = location.id
+
+        const { mapX, mapY, mapW, mapH } = this.layout
+
+        const boardX = mapX
+        const boardY = mapY
+        const boardW = mapW
+        const boardH = mapH
+
+        // Затемнение всей области карты.
+        // ВАЖНО: оно интерактивное и блокирует клики по иконкам под окном.
+        const blocker = this.add.rectangle(mapX, mapY, mapW, mapH, 0x000000, 0.72)
+            .setOrigin(0, 0)
+            .setDepth(78)
+            .setInteractive({ useHandCursor: false })
+
+        // Клик по затемнению вне доски закрывает окно
+        blocker.on('pointerdown', () => {
+            this.closeContractBoard()
+            this.activeLocationId = null
+        })
+
+        this.contractBoardObjects.push(blocker)
+
+        // Невидимая зона самой доски.
+        // Она нужна, чтобы клик внутри окна НЕ закрывал окно и НЕ проходил сквозь него.
+        const boardHitZone = this.add.zone(boardX, boardY, boardW, boardH)
+            .setOrigin(0, 0)
+            .setDepth(79)
+            .setInteractive()
+
+        boardHitZone.on('pointerdown', (pointer, localX, localY, event) => {
+            event.stopPropagation()
+        })
+
+        this.contractBoardObjects.push(boardHitZone)
+
+        const bg = this.add.graphics().setDepth(80)
+
+        bg.fillStyle(0x080808, 0.97)
+        bg.fillRoundedRect(boardX, boardY, boardW, boardH, 16)
+
+        bg.lineStyle(2, 0x5a4630, 1)
+        bg.strokeRoundedRect(boardX, boardY, boardW, boardH, 16)
+
+        this.contractBoardObjects.push(bg)
+
+        const title = this.add.text(boardX + 32, boardY + 24, 'ДОСКА КОНТРАКТОВ', {
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: '28px',
+            color: '#f0e2cb'
+        }).setDepth(81)
+
+        this.contractBoardObjects.push(title)
+
+        const subtitle = this.add.text(boardX + 32, boardY + 62, 'Выбери задание для охотника', {
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: '15px',
+            color: '#9f927f'
+        }).setDepth(81)
+
+        this.contractBoardObjects.push(subtitle)
+
+        const closeSize = 42
+        const closeX = boardX + boardW - closeSize - 24
+        const closeY = boardY + 22
+        const closeButton = this.add.image(closeX + closeSize / 2, closeY + closeSize / 2, 'ui_close_x')
+            .setDisplaySize(closeSize, closeSize)
+            .setDepth(83)
+
+        this.contractBoardObjects.push(closeButton)
+
+        const closeHitZone = this.add.zone(closeX, closeY, closeSize, closeSize)
+            .setOrigin(0, 0)
+            .setDepth(84)
+            .setInteractive({ useHandCursor: true })
+
+        closeHitZone.on('pointerover', () => {
+            closeButton.setDisplaySize(closeSize + 4, closeSize + 4)
+            closeButton.setAlpha(1)
+        })
+
+        closeHitZone.on('pointerout', () => {
+            closeButton.setDisplaySize(closeSize, closeSize)
+            closeButton.setAlpha(0.92)
+        })
+
+        closeHitZone.on('pointerdown', (pointer, localX, localY, event) => {
+            event.stopPropagation()
+            this.closeContractBoard()
+            this.activeLocationId = null
+        })
+
+        this.contractBoardObjects.push(closeHitZone)
 
         contracts.forEach((contract, index) => {
-            this.drawContractRow(contract, index)
+            this.drawContractCard(contract, index, boardX + 32, boardY + 105, boardW - 64)
         })
     }
 
-    drawContractRow(contract, index) {
-        const { rightX, rightY, rightW } = this.layout
-        const y = rightY + 150 + index * 112
+    drawContractCard(contract, index, x, startY, width) {
+        const cardH = 118
+        const gap = 14
+        const y = startY + index * (cardH + gap)
 
-        const isCompleted = isContractCompleted(contract.id)
-        const isUnlocked = this.isContractUnlocked(contract)
-        const canStart = canTakeContract() && isUnlocked && !isCompleted
+        const completed = isContractCompleted(contract.id)
+        const unlocked = this.isContractUnlocked(contract)
+        const canStart = unlocked && !completed && canTakeContract()
 
-        const row = this.add.graphics().setDepth(21)
+        const card = this.add.graphics().setDepth(81)
 
-        row.fillStyle(isCompleted || !isUnlocked ? 0x101010 : 0x1c1c1c, 0.94)
-        row.fillRoundedRect(rightX + 20, y, rightW - 40, 98, 10)
+        let fillColor = 0x151515
+        let borderColor = 0x4a3a28
 
-        row.lineStyle(1, isUnlocked ? 0x555555 : 0x442222, 1)
-        row.strokeRoundedRect(rightX + 20, y, rightW - 40, 98, 10)
-
-        this.infoPanelObjects.push(row)
-
-        this.addInfoText(rightX + 35, y + 12, contract.title, 14, isUnlocked ? '#ffffff' : '#777777')
-        this.addInfoText(rightX + 35, y + 36, 'Опасность: ' + contract.danger, 12, isUnlocked ? contract.dangerColor : '#777777')
-
-        if (isCompleted) {
-            this.addInfoText(rightX + 35, y + 60, 'Статус: выполнен', 12, '#79ff79')
-        } else if (!isUnlocked) {
-            this.addInfoText(rightX + 35, y + 58, this.getLockedReason(contract), 11, '#ff9999', 145)
-        } else if (!canTakeContract()) {
-            this.addInfoText(rightX + 35, y + 60, 'Нужен отдых', 12, '#ff7777')
-        } else {
-            this.addInfoText(rightX + 35, y + 60, 'Статус: доступен', 12, '#cccccc')
+        if (completed) {
+            fillColor = 0x102010
+            borderColor = 0x3d6b3d
+        } else if (!unlocked) {
+            fillColor = 0x101010
+            borderColor = 0x292929
         }
 
-        const buttonText = isCompleted
-            ? 'ВЫПОЛНЕН'
-            : !isUnlocked
-                ? 'ЗАКРЫТ'
-                : !canTakeContract()
-                    ? 'ОТДЫХ'
-                    : 'ВЗЯТЬ'
+        card.fillStyle(fillColor, 0.94)
+        card.fillRoundedRect(x, y, width, cardH, 10)
 
-        this.addInfoButton(rightX + 200, y + 58, buttonText, () => {
-            this.scene.start('ContractTravelScene', {
-                contractId: contract.id
-            })
-        }, !canStart)
-    }
+        card.lineStyle(1, borderColor, 1)
+        card.strokeRoundedRect(x, y, width, cardH, 10)
 
-    drawInfirmaryInfo() {
-        const { rightX, rightY } = this.layout
+        this.contractBoardObjects.push(card)
 
-        this.addInfoText(rightX + 25, rightY + 112, 'Лазарет: уровень ' + playerState.base.infirmaryLevel, 17, '#ffffff')
-        this.addInfoText(rightX + 25, rightY + 145, 'Отдых: ' + getRestCost() + ' серебра', 14, '#cccccc')
-        this.addInfoText(rightX + 25, rightY + 175, 'Лечение снимает раны и полностью восстанавливает здоровье.', 13, '#999999', 235)
+        const titleColor = unlocked ? '#ffffff' : '#666666'
 
-        this.addInfoButton(rightX + 25, rightY + 245, 'ОТДОХНУТЬ', () => {
-            const result = restAtBase()
+        const title = this.add.text(x + 18, y + 14, contract.title, {
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: '20px',
+            color: titleColor
+        }).setDepth(82)
 
-            this.showBaseMessage(result.message, result.success ? '#79ff79' : '#ff7777')
+        this.contractBoardObjects.push(title)
 
-            if (result.success) {
-                this.time.delayedCall(700, () => {
-                    this.scene.restart({
-                        selectedBuildingId: 'infirmary'
-                    })
-                })
-            }
-        })
+        const danger = this.add.text(x + 18, y + 43, 'Регион: ' + contract.region + '   Опасность: ' + contract.danger, {
+            fontSize: '14px',
+            color: unlocked ? contract.dangerColor : '#555555'
+        }).setDepth(82)
 
-        this.addInfoButton(rightX + 25, rightY + 295, 'КУПИТЬ БИНТ — ' + BANDAGE_COST, () => {
-            const result = buyBandageAtBase()
+        this.contractBoardObjects.push(danger)
 
-            this.showBaseMessage(result.message, result.success ? '#79ff79' : '#ff7777')
+        const rewardText =
+            'Награда: ' +
+            contract.reward.silverMin +
+            '-' +
+            contract.reward.silverMax +
+            ' серебра, опыт: ' +
+            contract.reward.exp
 
-            if (result.success) {
-                this.time.delayedCall(700, () => {
-                    this.scene.restart({
-                        selectedBuildingId: 'infirmary'
-                    })
-                })
-            }
-        })
+        const reward = this.add.text(x + 18, y + 68, rewardText, {
+            fontSize: '14px',
+            color: unlocked ? '#c9b27d' : '#555555'
+        }).setDepth(82)
 
-        const isUpgraded = playerState.base.infirmaryLevel >= 1
+        this.contractBoardObjects.push(reward)
 
-        this.addInfoButton(
-            rightX + 25,
-            rightY + 345,
-            isUpgraded ? 'ЛАЗАРЕТ УЛУЧШЕН' : 'УЛУЧШИТЬ — ' + INFIRMARY_UPGRADE_COST,
-            () => {
-                const result = upgradeInfirmary()
+        let statusText = ''
 
-                this.showBaseMessage(result.message, result.success ? '#79ff79' : '#ff7777')
+        if (completed) {
+            statusText = 'ВЫПОЛНЕНО'
+        } else if (!unlocked) {
+            statusText = 'ЗАКРЫТО'
+        } else if (!canTakeContract()) {
+            statusText = 'РЕЙНАР РАНЕН'
+        } else {
+            statusText = 'ПРИНЯТЬ'
+        }
 
-                if (result.success) {
-                    this.time.delayedCall(700, () => {
-                        this.scene.restart({
-                            selectedBuildingId: 'infirmary'
-                        })
-                    })
-                }
-            },
-            isUpgraded
-        )
-    }
+        const buttonColor = canStart ? '#3a2418' : '#222222'
+        const buttonTextColor = canStart ? '#ffffff' : '#777777'
 
-    drawApartmentInfo() {
-        const { rightX, rightY } = this.layout
-
-        this.addInfoText(rightX + 25, rightY + 112, 'Рейнар Вельм', 17, '#ffffff')
-        this.addInfoText(rightX + 25, rightY + 145, 'HP: ' + playerState.hp + ' / ' + getEffectiveMaxHP(), 14, '#79ff79')
-        this.addInfoText(rightX + 25, rightY + 175, 'Раны: ' + playerState.wounds, 14, playerState.wounds === 'нет' ? '#cccccc' : '#ffaa55')
-        this.addInfoText(rightX + 25, rightY + 205, 'Опыт: ' + playerState.exp, 14, '#cccccc')
-        this.addInfoText(rightX + 25, rightY + 235, 'Серебро: ' + playerState.silver, 14, '#cccccc')
-        this.addInfoText(rightX + 25, rightY + 290, 'Личная комната охотника. Позже здесь появятся дневник, снаряжение и личные решения.', 13, '#999999', 235)
-    }
-
-    drawRestInfo() {
-        const { rightX, rightY } = this.layout
-
-        this.addInfoText(rightX + 25, rightY + 112, 'Место отдыха', 17, '#ffffff')
-        this.addInfoText(rightX + 25, rightY + 150, 'Здесь охотники приходят в себя после дороги и боя.', 13, '#999999', 235)
-        this.addInfoText(rightX + 25, rightY + 220, 'Позже здесь появятся усталость, стресс и восстановление духа.', 13, '#777777', 235)
-    }
-
-    drawPlaceholderInfo(title, text) {
-        const { rightX, rightY } = this.layout
-
-        this.addInfoText(rightX + 25, rightY + 112, title, 17, '#ffffff')
-        this.addInfoText(rightX + 25, rightY + 150, text, 13, '#999999', 235)
-        this.addInfoText(rightX + 25, rightY + 250, 'Система будет добавлена позже.', 13, '#777777', 235)
-    }
-
-    addInfoText(x, y, text, fontSize, color, wrapWidth = null) {
-        const textObject = this.add.text(x, y, text, {
-            fontSize: fontSize + 'px',
-            color,
-            wordWrap: wrapWidth ? { width: wrapWidth } : undefined,
-            lineSpacing: 6
-        }).setDepth(22)
-
-        this.infoPanelObjects.push(textObject)
-
-        return textObject
-    }
-
-    addInfoButton(x, y, text, onClick, disabled = false) {
-        const button = this.add.text(x, y, text, {
-            fontSize: '13px',
-            backgroundColor: disabled ? '#222222' : '#333333',
-            color: disabled ? '#777777' : '#ffffff',
+        const button = this.add.text(x + width - 135, y + 40, statusText, {
+            fontSize: '15px',
+            color: buttonTextColor,
+            backgroundColor: buttonColor,
             padding: {
-                x: 10,
-                y: 7
+                x: 16,
+                y: 10
             }
-        }).setDepth(22)
+        })
+            .setDepth(83)
+            .setOrigin(0.5, 0)
 
-        this.infoPanelObjects.push(button)
+        this.contractBoardObjects.push(button)
 
-        if (!disabled) {
-            button.setInteractive()
+        if (canStart) {
+            button.setInteractive({ useHandCursor: true })
 
             button.on('pointerover', () => {
                 button.setStyle({
-                    backgroundColor: '#555555'
+                    backgroundColor: '#5a3520'
                 })
             })
 
             button.on('pointerout', () => {
                 button.setStyle({
-                    backgroundColor: '#333333'
+                    backgroundColor: buttonColor
                 })
             })
 
-            button.on('pointerdown', onClick)
+            button.on('pointerdown', () => {
+                this.scene.start('ContractTravelScene', {
+                    contractId: contract.id
+                })
+            })
         }
 
-        return button
-    }
+        if (!unlocked && contract.requiredCompletedContracts.length > 0) {
+            const lockText = this.add.text(x + 18, y + 93, 'Сначала нужно выполнить предыдущий контракт.', {
+                fontSize: '12px',
+                color: '#666666'
+            }).setDepth(82)
 
-    clearInfoPanel() {
-        this.infoPanelObjects.forEach((object) => {
-            object.destroy()
-        })
-
-        this.infoPanelObjects = []
-    }
-
-    showBaseMessage(message, color = '#ffffff') {
-        if (this.baseMessageText) {
-            this.baseMessageText.destroy()
+            this.contractBoardObjects.push(lockText)
         }
-
-        const { rightX, rightY } = this.layout
-
-        this.baseMessageText = this.add.text(rightX + 25, rightY + 475, message, {
-            fontSize: '13px',
-            color,
-            wordWrap: {
-                width: 235
-            }
-        }).setDepth(30)
     }
 
     isContractUnlocked(contract) {
-        const requiredContracts = contract.requiredCompletedContracts || []
-
-        return requiredContracts.every((contractId) => {
-            return isContractCompleted(contractId)
+        // Контракт открыт, если все нужные предыдущие контракты выполнены
+        return contract.requiredCompletedContracts.every((requiredContractId) => {
+            return isContractCompleted(requiredContractId)
         })
     }
 
-    getLockedReason(contract) {
-        const requiredContracts = contract.requiredCompletedContracts || []
-
-        if (requiredContracts.length === 0) {
-            return ''
-        }
-
-        const missingContracts = requiredContracts.filter((contractId) => {
-            return !isContractCompleted(contractId)
+    closeContractBoard() {
+        this.contractBoardObjects.forEach((object) => {
+            object.destroy()
         })
 
-        if (missingContracts.length === 0) {
-            return ''
-        }
-
-        const missingTitles = missingContracts.map((contractId) => {
-            const requiredContract = contracts.find((item) => item.id === contractId)
-
-            return requiredContract ? requiredContract.title : contractId
-        })
-
-        return 'Требуется: ' + missingTitles.join(', ')
+        this.contractBoardObjects = []
     }
 }

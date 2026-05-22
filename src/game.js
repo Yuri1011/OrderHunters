@@ -1,24 +1,32 @@
 import Phaser from 'phaser'
-import { OrderBaseScene } from './scenes/OrderBaseScene'
-import { ContractTravelScene } from './scenes/ContractTravelScene'
-import { BattleScene } from './scenes/BattleScene'
-import { ContractResultScene } from './scenes/ContractResultScene'
 
-export function createGame() {
-    const config = {
-        type: Phaser.AUTO,
-        parent: 'app',
+import { OrderBaseScene } from './scenes/OrderBaseScene.js'
+import { ContractBoardScene } from './scenes/ContractBoardScene.js'
+import { ContractTravelScene } from './scenes/ContractTravelScene.js'
+import { BattleScene } from './scenes/BattleScene.js'
+import { ResultsScene } from './scenes/ResultsScene.js'
 
-        scale: {
-            mode: Phaser.Scale.FIT,
-            autoCenter: Phaser.Scale.CENTER_BOTH,
-            width: 1280,
-            height: 720
-        },
+const config = {
+    type: Phaser.AUTO,
+    parent: 'game-container',
+    backgroundColor: '#050505',
 
-        backgroundColor: '#000000',
-        scene: [OrderBaseScene, ContractTravelScene, BattleScene, ContractResultScene]
-    }
+    // Базовое внутреннее разрешение игры
+    width: 1600,
+    height: 900,
 
-    new Phaser.Game(config)
+    scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.NO_CENTER
+    },
+
+    scene: [
+        OrderBaseScene,
+        ContractBoardScene,
+        ContractTravelScene,
+        BattleScene,
+        ResultsScene
+    ]
 }
+
+export default new Phaser.Game(config)

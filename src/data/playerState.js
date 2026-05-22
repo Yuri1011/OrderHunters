@@ -23,6 +23,9 @@ export const playerState = {
     // Список выполненных контрактов
     completedContracts: [],
 
+    // Список контрактов, о которых игрок уже был уведомлён
+    viewedContracts: [],
+
     // Развитие базы Ордена
     base: {
         infirmaryLevel: 0
@@ -71,6 +74,10 @@ export function loadPlayerState() {
         // На всякий случай защищаемся от битого сохранения
         if (!Array.isArray(playerState.completedContracts)) {
             playerState.completedContracts = []
+        }
+
+        if (!Array.isArray(playerState.viewedContracts)) {
+            playerState.viewedContracts = []
         }
 
         if (typeof playerState.bandages !== 'number') {

@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { getContractById, contracts } from '../data/contracts.js'
-import { playerState, completeContract, savePlayerState, MAX_BANDAGES } from '../data/playerState.js'
+import { playerState, completeContract, clearActiveContract, savePlayerState, splitRewardByParty, MAX_BANDAGES } from '../data/playerState.js'
 
 export class ContractResultScene extends Phaser.Scene {
     constructor() {
@@ -13,6 +13,8 @@ export class ContractResultScene extends Phaser.Scene {
         this.result = data.result || 'victory'
         this.silver = data.silver || 0
         this.exp = data.exp || 0
+        this.playerReward = this.silver
+        this.playerExp = this.exp
         this.bandagesLoot = 0
 
         this.remainingHP = typeof data.remainingHP === 'number'
@@ -20,8 +22,17 @@ export class ContractResultScene extends Phaser.Scene {
             : playerState.hp
 
         if (this.result === 'victory') {
-            playerState.silver += this.silver
-            playerState.exp += this.exp
+            const playerReward = splitRewardByParty(this.silver)
+
+            // Рейнар получает только свою долю опыта.
+            // Если он один — получает весь опыт.
+            const playerExp = splitRewardByParty(this.exp)
+
+            playerState.silver += playerReward
+            playerState.exp += playerExp
+
+            this.playerReward = playerReward
+            this.playerExp = playerExp
 
             // После победы сохраняем фактическое HP после боя
             playerState.hp = Math.max(this.remainingHP, 1)
@@ -54,6 +65,10 @@ export class ContractResultScene extends Phaser.Scene {
             // После поражения охотник выживает, но получает тяжёлые последствия
             playerState.hp = 1
             playerState.wounds = 'тяжёлое ранение'
+
+            // Контракт провален, но не выполнен.
+            // У героя больше нет активного контракта.
+            clearActiveContract()
         }
 
         savePlayerState()
@@ -88,12 +103,20 @@ export class ContractResultScene extends Phaser.Scene {
             color: '#ffffff'
         })
 
-        this.add.text(430, 380, 'Серебро: ' + this.silver, {
+        const rewardText = isVictory
+            ? 'Общая награда: ' + this.silver + ' серебра'
+            : 'Серебро: ' + this.silver
+
+        const expText = isVictory
+            ? 'Твоя доля: +' + this.playerReward + ' серебра, +' + this.playerExp + ' опыта'
+            : 'Опыт: ' + this.exp
+
+        this.add.text(430, 380, rewardText, {
             fontSize: '22px',
             color: '#dddddd'
         })
 
-        this.add.text(430, 420, 'Опыт: ' + this.exp, {
+        this.add.text(430, 420, expText, {
             fontSize: '22px',
             color: '#dddddd'
         })

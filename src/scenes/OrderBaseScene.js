@@ -3,6 +3,7 @@ import { contracts } from '../data/contracts.js'
 import { baseBuildings, getBaseBuildingById } from '../data/baseBuildings.js'
 import { createBaseSceneLayout } from '../ui/baseSceneLayout.js'
 import { createNavButtonBackground } from '../ui/navButtonBackground.js'
+import { createReputationBar } from '../ui/reputationBar.js'
 
 import {
     playerState,
@@ -10,6 +11,8 @@ import {
     isContractCompleted,
     canTakeContract,
     MAX_BANDAGES,
+    MAX_REPUTATION,
+    getReputationTitle,
     getEffectiveMaxHP
 } from '../data/playerState.js'
 
@@ -101,23 +104,38 @@ export class OrderBaseScene extends Phaser.Scene {
 
     drawTopBar() {
         const { topX, topY, topW, topH } = this.layout
+        const reputationW = 318
+        const reputationX = topX + topW / 2 - reputationW / 2
 
         this.add.image(topX, topY, 'ui_top_panel_frame')
             .setOrigin(0, 0)
             .setDisplaySize(topW, topH)
             .setDepth(5)
 
+        createReputationBar(
+            this,
+            reputationX,
+            topY + 12,
+            playerState.reputation,
+            getReputationTitle(),
+            {
+                width: reputationW,
+                depth: 6,
+                maxReputation: MAX_REPUTATION
+            }
+        )
+
         this.add.text(topX + 92, topY + 24, 'Серебро: ' + playerState.silver, {
             fontSize: '16px',
             color: '#cccccc'
         }).setDepth(6)
 
-        this.add.text(topX + 270, topY + 24, 'Бинты: ' + playerState.bandages + ' / ' + MAX_BANDAGES, {
+        this.add.text(topX + 250, topY + 24, 'Бинты: ' + playerState.bandages + ' / ' + MAX_BANDAGES, {
             fontSize: '16px',
             color: '#cccccc'
         }).setDepth(6)
 
-        this.add.text(topX + 455, topY + 24, 'Опыт: ' + playerState.exp, {
+        this.add.text(topX + topW - 430, topY + 24, 'Опыт: ' + playerState.exp, {
             fontSize: '16px',
             color: '#cccccc'
         }).setDepth(6)
@@ -126,7 +144,7 @@ export class OrderBaseScene extends Phaser.Scene {
             return isContractCompleted(contract.id)
         }).length
 
-        this.add.text(topX + 650, topY + 24, 'Контракты: ' + completedCount + ' / ' + contracts.length, {
+        this.add.text(topX + topW - 250, topY + 24, 'Контракты: ' + completedCount + ' / ' + contracts.length, {
             fontSize: '16px',
             color: '#999999'
         }).setDepth(6)

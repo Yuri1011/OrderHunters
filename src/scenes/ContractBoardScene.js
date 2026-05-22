@@ -2,12 +2,17 @@ import Phaser from 'phaser'
 import { contracts } from '../data/contracts.js'
 import { createBaseSceneLayout } from '../ui/baseSceneLayout.js'
 import { createNavButtonBackground } from '../ui/navButtonBackground.js'
+import { createReputationBar } from '../ui/reputationBar.js'
 import {
     playerState,
     savePlayerState,
     isContractCompleted,
     canTakeContract,
+    acceptContract,
+    isContractActive,
     MAX_BANDAGES,
+    MAX_REPUTATION,
+    getReputationTitle,
     getEffectiveMaxHP
 } from '../data/playerState.js'
 
@@ -39,6 +44,7 @@ export class ContractBoardScene extends Phaser.Scene {
 
     create() {
         this.bottomNavObjects = []
+        this.boardMessageText = null
 
         this.calculateLayout()
         this.markVisibleContractsAsViewed()
@@ -98,22 +104,36 @@ export class ContractBoardScene extends Phaser.Scene {
 
     drawTopBar() {
         const { topX, topY, topW, topH } = this.layout
+        const reputationW = 318
+        const reputationX = topX + topW / 2 - reputationW / 2
 
         this.add.image(topX, topY, 'ui_top_panel_frame')
             .setOrigin(0, 0)
             .setDisplaySize(topW, topH)
+
+        createReputationBar(
+            this,
+            reputationX,
+            topY + 12,
+            playerState.reputation,
+            getReputationTitle(),
+            {
+                width: reputationW,
+                maxReputation: MAX_REPUTATION
+            }
+        )
 
         this.add.text(topX + 92, topY + 24, 'Серебро: ' + playerState.silver, {
             fontSize: '16px',
             color: '#cccccc'
         })
 
-        this.add.text(topX + 270, topY + 24, 'Бинты: ' + playerState.bandages + ' / ' + MAX_BANDAGES, {
+        this.add.text(topX + 250, topY + 24, 'Бинты: ' + playerState.bandages + ' / ' + MAX_BANDAGES, {
             fontSize: '16px',
             color: '#cccccc'
         })
 
-        this.add.text(topX + 455, topY + 24, 'Опыт: ' + playerState.exp, {
+        this.add.text(topX + topW - 430, topY + 24, 'Опыт: ' + playerState.exp, {
             fontSize: '16px',
             color: '#cccccc'
         })
@@ -122,7 +142,7 @@ export class ContractBoardScene extends Phaser.Scene {
             return isContractCompleted(contract.id)
         }).length
 
-        this.add.text(topX + 650, topY + 24, 'Контракты: ' + completedCount + ' / ' + contracts.length, {
+        this.add.text(topX + topW - 250, topY + 24, 'Контракты: ' + completedCount + ' / ' + contracts.length, {
             fontSize: '16px',
             color: '#999999'
         })
@@ -362,7 +382,13 @@ export class ContractBoardScene extends Phaser.Scene {
     drawContractCard(contract, x, y, w, h) {
         const completed = isContractCompleted(contract.id)
         const unlocked = this.isContractUnlocked(contract)
-        const canStart = unlocked && !completed && canTakeContract()
+        const available = canTakeContract(contract)
+        const active = isContractActive(contract.id)
+        const hasAnotherActiveContract =
+            playerState.activeContractId !== null &&
+            playerState.activeContractId !== contract.id
+        const canStart = unlocked && !completed && (active || (!hasAnotherActiveContract && available))
+        const canClickButton = canStart || (unlocked && !completed && hasAnotherActiveContract)
 
         const frame = this.add.image(x + w / 2, y + h / 2, 'contract_card_frame')
             .setDisplaySize(w, h)
@@ -409,17 +435,33 @@ export class ContractBoardScene extends Phaser.Scene {
             }).setOrigin(0.5)
         }
 
-        let buttonText = 'ВЗЯТЬ КОНТРАКТ'
+        let buttonText = completed
+            ? 'ВЫПОЛНЕН'
+            : active
+                ? 'ПОДГОТОВИТЬСЯ'
+                : hasAnotherActiveContract
+                    ? 'ЗАНЯТ'
+                    : 'ВЗЯТЬ'
 
-        if (completed) {
-            buttonText = 'ВЫПОЛНЕНО'
-        } else if (!unlocked) {
-            buttonText = 'ЗАКРЫТО'
-        } else if (!canTakeContract()) {
-            buttonText = 'РЕЙНАР РАНЕН'
+        if (!completed && !active) {
+            if (!unlocked) {
+                buttonText = 'ЗАКРЫТО'
+            } else if (!hasAnotherActiveContract && !available) {
+                buttonText = 'РЕЙНАР РАНЕН'
+            }
         }
 
-        this.drawContractButton(x + 30, y + h - 62, w - 60, 40, buttonText, canStart, contract)
+        this.drawContractButton(
+            x + 30,
+            y + h - 62,
+            w - 60,
+            40,
+            buttonText,
+            canClickButton,
+            contract,
+            active,
+            hasAnotherActiveContract
+        )
 
         if (!unlocked) {
             this.add.rectangle(x + w / 2, y + h / 2, w - 18, h - 18, 0x000000, 0.34)
@@ -462,7 +504,7 @@ export class ContractBoardScene extends Phaser.Scene {
         }).setOrigin(1, 0)
     }
 
-    drawContractButton(x, y, w, h, label, enabled, contract) {
+    drawContractButton(x, y, w, h, label, enabled, contract, active, hasAnotherActiveContract) {
         const buttonBg = this.add.graphics()
 
         const draw = (hover = false) => {
@@ -505,9 +547,55 @@ export class ContractBoardScene extends Phaser.Scene {
         })
 
         hit.on('pointerdown', () => {
+            // Нельзя взять новый контракт, пока другой контракт активен
+            if (hasAnotherActiveContract) {
+                this.showBoardMessage('Сначала заверши текущий контракт.')
+                return
+            }
+
+            // Первый клик — просто принимаем контракт
+            if (!active) {
+                acceptContract(contract.id)
+                this.scene.restart()
+                return
+            }
+
+            // Второй клик — пока временно идём в путешествие.
+            // Следующим шагом заменим это на переход в Казарму.
             this.scene.start('ContractTravelScene', {
                 contractId: contract.id
             })
+        })
+    }
+
+    showBoardMessage(message) {
+        if (this.boardMessageText) {
+            this.boardMessageText.destroy()
+            this.boardMessageText = null
+        }
+
+        const { gameX, gameY, gameW } = this.layout
+
+        this.boardMessageText = this.add.text(gameX + gameW / 2, gameY + 108, message, {
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: '16px',
+            color: '#f0e2cb',
+            backgroundColor: '#111111',
+            padding: {
+                x: 14,
+                y: 8
+            }
+        })
+            .setOrigin(0.5, 0)
+            .setDepth(100)
+
+        const messageText = this.boardMessageText
+
+        this.time.delayedCall(2000, () => {
+            if (this.boardMessageText === messageText) {
+                this.boardMessageText.destroy()
+                this.boardMessageText = null
+            }
         })
     }
 

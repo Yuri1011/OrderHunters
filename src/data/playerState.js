@@ -2,6 +2,8 @@ export const REST_COST = 10
 export const BANDAGE_COST = 5
 export const MAX_BANDAGES = 3
 export const INFIRMARY_UPGRADE_COST = 50
+export const MAX_REPUTATION = 100
+export const MAX_PARTY_SIZE = 5
 
 const SAVE_KEY = 'orderOfHuntersPlayerState'
 
@@ -14,17 +16,24 @@ export const playerState = {
 
     silver: 0,
     exp: 0,
+    reputation: 50,
 
     wounds: 'нет',
 
     // Расходники
     bandages: 2,
 
+    // Текущий отряд на контракт
+    party: ['reynar'],
+
     // Список выполненных контрактов
     completedContracts: [],
 
     // Список контрактов, о которых игрок уже был уведомлён
     viewedContracts: [],
+
+    // Текущий активный контракт
+    activeContractId: null,
 
     // Развитие базы Ордена
     base: {
@@ -71,6 +80,11 @@ export function loadPlayerState() {
         // Аккуратно подмешиваем сохранённые данные в текущее состояние
         Object.assign(playerState, parsedState)
 
+        // Если в старом сохранении ещё нет отряда — создаём отряд с одним Рейнаром
+        if (!Array.isArray(playerState.party) || playerState.party.length === 0) {
+            playerState.party = ['reynar']
+        }
+
         // На всякий случай защищаемся от битого сохранения
         if (!Array.isArray(playerState.completedContracts)) {
             playerState.completedContracts = []
@@ -80,9 +94,23 @@ export function loadPlayerState() {
             playerState.viewedContracts = []
         }
 
+        if (typeof playerState.activeContractId !== 'string' || playerState.activeContractId.length === 0) {
+            playerState.activeContractId = null
+        }
+
+        if (playerState.completedContracts.includes(playerState.activeContractId)) {
+            playerState.activeContractId = null
+        }
+
         if (typeof playerState.bandages !== 'number') {
             playerState.bandages = 2
         }
+
+        if (!Number.isFinite(playerState.reputation)) {
+            playerState.reputation = 50
+        }
+
+        playerState.reputation = Math.max(0, Math.min(playerState.reputation, MAX_REPUTATION))
 
         if (!playerState.base) {
             playerState.base = {
@@ -110,11 +138,40 @@ export function completeContract(contractId) {
         playerState.completedContracts.push(contractId)
     }
 
+    if (playerState.activeContractId === contractId) {
+        playerState.activeContractId = null
+    }
+
     savePlayerState()
 }
 
 export function isContractCompleted(contractId) {
     return playerState.completedContracts.includes(contractId)
+}
+
+export function acceptContract(contractId) {
+    playerState.activeContractId = contractId
+
+    savePlayerState()
+}
+
+export function clearActiveContract() {
+    playerState.activeContractId = null
+
+    savePlayerState()
+}
+
+export function isContractActive(contractId) {
+    return playerState.activeContractId === contractId
+}
+
+export function getReputationTitle(reputation = playerState.reputation) {
+    if (reputation >= 85) return 'Легенда'
+    if (reputation >= 65) return 'Прославленный'
+    if (reputation >= 40) return 'Уважаемый'
+    if (reputation >= 20) return 'Известный'
+
+    return 'Безвестный'
 }
 
 export function getCurrentWoundEffect() {
@@ -237,3 +294,64 @@ export function upgradeInfirmary() {
 
 // Загружаем сохранение сразу при старте игры
 loadPlayerState()
+
+export function getPartySize() {
+    // Минимум 1, чтобы не было деления на ноль
+    if (!Array.isArray(playerState.party) || playerState.party.length === 0) {
+        return 1
+    }
+
+    return playerState.party.length
+}
+
+export function canAddHunterToParty() {
+    // В отряде не может быть больше 5 охотников
+    return getPartySize() < MAX_PARTY_SIZE
+}
+
+export function splitRewardByParty(totalReward) {
+    const partySize = getPartySize()
+
+    // Делим награду поровну между участниками отряда
+    return Math.floor(totalReward / partySize)
+}
+
+export function addHunterToParty(hunterId) {
+    // Если отряда почему-то нет — создаём его с Рейнаром
+    if (!Array.isArray(playerState.party)) {
+        playerState.party = ['reynar']
+    }
+
+    // Не добавляем одного и того же охотника дважды
+    if (playerState.party.includes(hunterId)) {
+        return false
+    }
+
+    // Больше 5 охотников в отряде быть не может
+    if (!canAddHunterToParty()) {
+        return false
+    }
+
+    playerState.party.push(hunterId)
+    savePlayerState()
+
+    return true
+}
+
+export function removeHunterFromParty(hunterId) {
+    // Рейнара нельзя убрать из отряда
+    if (hunterId === 'reynar') {
+        return false
+    }
+
+    if (!Array.isArray(playerState.party)) {
+        playerState.party = ['reynar']
+        savePlayerState()
+        return false
+    }
+
+    playerState.party = playerState.party.filter((id) => id !== hunterId)
+    savePlayerState()
+
+    return true
+}

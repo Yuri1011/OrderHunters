@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 
 import { OrderBaseScene } from './scenes/OrderBaseScene.js'
 import { ContractBoardScene } from './scenes/ContractBoardScene.js'
+import BarracksScene from './scenes/BarracksScene.js'
 import { ContractTravelScene } from './scenes/ContractTravelScene.js'
 import { BattleScene } from './scenes/BattleScene.js'
 import { ResultsScene } from './scenes/ResultsScene.js'
@@ -23,6 +24,7 @@ const config = {
     scene: [
         OrderBaseScene,
         ContractBoardScene,
+        BarracksScene,
         ContractTravelScene,
         BattleScene,
         ResultsScene

@@ -560,11 +560,8 @@ export class ContractBoardScene extends Phaser.Scene {
                 return
             }
 
-            // Второй клик — пока временно идём в путешествие.
-            // Следующим шагом заменим это на переход в Казарму.
-            this.scene.start('ContractTravelScene', {
-                contractId: contract.id
-            })
+            // Второй клик — переходим в казарму для подготовки отряда
+            this.scene.start('BarracksScene')
         })
     }
 

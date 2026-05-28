@@ -27,7 +27,7 @@ export class OrderBaseScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('hunter_base', '/assets/backgrounds/base-bg.png')
+        this.load.image('hunter_base', '/assets/backgrounds/base-bg.webp')
         this.load.image('barracks_bg', 'assets/backgrounds/barracks-bg.webp')
         this.load.image('parchment_panel', '/assets/ui/panel-building-card.png')
         this.load.image('ui_messenger_order', '/assets/ui/vwstovoi.webp')

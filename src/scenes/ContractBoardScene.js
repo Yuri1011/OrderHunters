@@ -28,8 +28,8 @@ export class ContractBoardScene extends Phaser.Scene {
         this.load.image('ui_top_panel_frame', '/assets/ui/top-panel-frame.webp')
         this.load.image('ui_nav_button', '/assets/ui/nav-button.webp')
         this.load.spritesheet('scribeWriting', '/assets/characters/scribe_writing_spritesheet.png', {
-            frameWidth: 443,
-            frameHeight: 443
+            frameWidth: 160,
+            frameHeight: 160
         })
 
         this.load.image('icon_forge', '/assets/icons/base/forge.png')
@@ -75,7 +75,7 @@ export class ContractBoardScene extends Phaser.Scene {
                 start: 0,
                 end: 7
             }),
-            frameRate: 3,
+            frameRate: 4,
             repeat: -1
         })
     }
@@ -83,9 +83,16 @@ export class ContractBoardScene extends Phaser.Scene {
     drawScribe() {
         const { gameX, gameY, gameW, gameH } = this.layout
 
-        const scribe = this.add.sprite(gameX + gameW * 0.78, gameY + gameH * 0.66, 'scribeWriting')
+        // Писарь за столом справа.
+        // Важно: это один sprite, а не куча кадров на сцене.
+        const scribe = this.add.sprite(
+            gameX + gameW * 0.78,
+            gameY + gameH * 0.66,
+            'scribeWriting'
+        )
 
-        scribe.setScale(0.55)
+        scribe.setScale(1.15)
+        scribe.setDepth(6)
         scribe.play('scribe_write_idle')
     }
 

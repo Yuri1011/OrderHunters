@@ -4,8 +4,15 @@ export const baseBuildings = [
         title: 'Кузница',
         subtitle: 'Оружие и снаряжение',
         icon: 'icon_forge',
+        sprite: 'location_forge',
+        spritePath: '/assets/locations/base/forge.png',
+        width: 360,
+        height: 290,
+        hoverScale: 1.03,
+        originX: 0.5,
+        originY: 1,
         x: 0.145,
-        y: 0.395
+        y: 0.690
     },
     {
         id: 'council',

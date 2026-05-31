@@ -45,6 +45,12 @@ export class OrderBaseScene extends Phaser.Scene {
         this.load.image('icon_rest', '/assets/icons/base/rest.png')
         this.load.image('icon_contracts', '/assets/icons/base/contracts.png')
         this.load.image('icon_training', '/assets/icons/base/training.png')
+
+        baseBuildings.forEach((location) => {
+            if (location.sprite && location.spritePath) {
+                this.load.image(location.sprite, location.spritePath)
+            }
+        })
     }
 
     init(data) {
@@ -66,6 +72,7 @@ export class OrderBaseScene extends Phaser.Scene {
         this.locationPanelActionObjects = []
         this.baseImage = null
         this.mapImage = null
+        this.mapMask = null
         // Объекты доски контрактов, чтобы потом можно было их удалить
         this.contractBoardObjects = []
         // Объекты нижнего меню, чтобы можно было перерисовывать панель
@@ -167,18 +174,54 @@ export class OrderBaseScene extends Phaser.Scene {
         // cover, чтобы не было пустот внутри рамки
         const imageScale = Math.max(scaleX, scaleY)
         this.baseImage.setScale(imageScale)
+        this.baseImage.setPosition(
+            mapX - Math.round((this.baseImage.displayWidth - mapW) / 2),
+            mapY - Math.round((this.baseImage.displayHeight - mapH) / 2)
+        )
 
         const mapMaskShape = this.make.graphics({ x: 0, y: 0, add: false })
         mapMaskShape.fillStyle(0xffffff)
         mapMaskShape.fillRect(mapX, mapY, mapW, mapH)
 
-        const mapMask = mapMaskShape.createGeometryMask()
-        this.baseImage.setMask(mapMask)
+        this.mapMask = mapMaskShape.createGeometryMask()
+        this.baseImage.setMask(this.mapMask)
 
         this.add.rectangle(mapX, mapY, mapW, mapH, 0x000000, 0.06)
             .setOrigin(0, 0)
             .setDepth(5)
 
+    }
+
+    getMapImagePoint(location) {
+        return {
+            x: this.baseImage.x + location.x * this.baseImage.displayWidth,
+            y: this.baseImage.y + location.y * this.baseImage.displayHeight
+        }
+    }
+
+    getLocationSpriteSize(location, hover = false) {
+        const width = location.width || location.size || MAP_ICON_SIZE
+        const height = location.height || location.size || MAP_ICON_SIZE
+
+        if (!hover) {
+            return { width, height }
+        }
+
+        const hoverScale = location.hoverScale || MAP_ICON_HOVER_SIZE / MAP_ICON_SIZE
+
+        return {
+            width: location.hoverWidth || Math.round(width * hoverScale),
+            height: location.hoverHeight || Math.round(height * hoverScale)
+        }
+    }
+
+    getLocationLabelPoint(location, point, size) {
+        const originY = location.originY ?? 0.5
+
+        return {
+            x: point.x,
+            y: point.y - size.height * originY - 12
+        }
     }
 
     drawPlayerPanel() {
@@ -249,27 +292,33 @@ export class OrderBaseScene extends Phaser.Scene {
         this.locationIcons = {}
         this.hideHoverLabel()
 
-        const { mapX, mapY, mapW, mapH } = this.layout
-
         baseBuildings.forEach((location) => {
-            const iconX = mapX + location.x * mapW
-            const iconY = mapY + location.y * mapH
+            const point = this.getMapImagePoint(location)
+            const textureKey = location.sprite || location.icon
+            const normalSize = this.getLocationSpriteSize(location)
+            const hoverSize = this.getLocationSpriteSize(location, true)
+            const labelPoint = this.getLocationLabelPoint(location, point, normalSize)
 
-            const icon = this.add.image(iconX, iconY, location.icon)
-                .setDisplaySize(MAP_ICON_SIZE, MAP_ICON_SIZE)
+            const icon = this.add.image(point.x, point.y, textureKey)
+                .setOrigin(location.originX ?? 0.5, location.originY ?? 0.5)
+                .setDisplaySize(normalSize.width, normalSize.height)
                 .setDepth(30)
                 .setInteractive({ useHandCursor: true })
 
+            if (this.mapMask) {
+                icon.setMask(this.mapMask)
+            }
+
             icon.on('pointerover', () => {
-                icon.setDisplaySize(MAP_ICON_HOVER_SIZE, MAP_ICON_HOVER_SIZE)
+                icon.setDisplaySize(hoverSize.width, hoverSize.height)
                 this.showHoverLabel(location, {
-                    x: iconX,
-                    y: iconY
+                    x: labelPoint.x,
+                    y: labelPoint.y
                 })
             })
 
             icon.on('pointerout', () => {
-                icon.setDisplaySize(MAP_ICON_SIZE, MAP_ICON_SIZE)
+                icon.setDisplaySize(normalSize.width, normalSize.height)
                 this.hideHoverLabel()
             })
 

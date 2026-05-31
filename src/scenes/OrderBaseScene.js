@@ -224,6 +224,17 @@ export class OrderBaseScene extends Phaser.Scene {
         }
     }
 
+    tweenLocationSize(icon, size) {
+        this.tweens.killTweensOf(icon)
+        this.tweens.add({
+            targets: icon,
+            displayWidth: size.width,
+            displayHeight: size.height,
+            duration: 120,
+            ease: 'Sine.easeOut'
+        })
+    }
+
     drawPlayerPanel() {
         const { leftX, leftY, leftW, leftH } = this.layout
 
@@ -310,7 +321,7 @@ export class OrderBaseScene extends Phaser.Scene {
             }
 
             icon.on('pointerover', () => {
-                icon.setDisplaySize(hoverSize.width, hoverSize.height)
+                this.tweenLocationSize(icon, hoverSize)
                 this.showHoverLabel(location, {
                     x: labelPoint.x,
                     y: labelPoint.y
@@ -318,7 +329,7 @@ export class OrderBaseScene extends Phaser.Scene {
             })
 
             icon.on('pointerout', () => {
-                icon.setDisplaySize(normalSize.width, normalSize.height)
+                this.tweenLocationSize(icon, normalSize)
                 this.hideHoverLabel()
             })
 

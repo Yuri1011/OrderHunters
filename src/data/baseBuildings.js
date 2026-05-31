@@ -8,7 +8,7 @@ export const baseBuildings = [
         spritePath: '/assets/locations/base/forge.png',
         width: 360,
         height: 290,
-        hoverScale: 1.03,
+        hoverScale: 1.015,
         originX: 0.5,
         originY: 1,
         x: 0.145,
@@ -35,8 +35,15 @@ export const baseBuildings = [
         title: 'Казармы',
         subtitle: 'Охотники Ордена',
         icon: 'icon_barracks',
-        x: 0.980,
-        y: 0.310
+        sprite: 'location_barracks',
+        spritePath: '/assets/locations/base/barracks.png',
+        width: 410,
+        height: 315,
+        hoverScale: 1.015,
+        originX: 0.5,
+        originY: 1,
+        x: 0.820,
+        y: 0.755
     },
     {
         id: 'quarters',

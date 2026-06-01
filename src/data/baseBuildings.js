@@ -6,8 +6,8 @@ export const baseBuildings = [
         icon: 'icon_forge',
         sprite: 'location_forge',
         spritePath: '/assets/locations/base/forge.png',
-        width: 360,
-        height: 290,
+        width: 330,
+        height: 266,
         hoverScale: 1.015,
         originX: 0.5,
         originY: 1,
@@ -19,8 +19,15 @@ export const baseBuildings = [
         title: 'Совет Ордена',
         subtitle: 'Решения и репутация',
         icon: 'icon_council',
-        x: 0.520,
-        y: 0.080
+        sprite: 'location_citadel',
+        spritePath: '/assets/locations/base/citadel.png',
+        width: 640,
+        height: 480,
+        hoverScale: 1.012,
+        originX: 0.5,
+        originY: 1,
+        x: 0.515,
+        y: 0.600
     },
     {
         id: 'infirmary',
@@ -37,8 +44,8 @@ export const baseBuildings = [
         icon: 'icon_barracks',
         sprite: 'location_barracks',
         spritePath: '/assets/locations/base/barracks.png',
-        width: 410,
-        height: 315,
+        width: 460,
+        height: 350,
         hoverScale: 1.015,
         originX: 0.5,
         originY: 1,
@@ -74,8 +81,15 @@ export const baseBuildings = [
         title: 'Тренировочный двор',
         subtitle: 'Боевые навыки',
         icon: 'icon_training',
-        x: 0.645,
-        y: 0.630
+        sprite: 'location_training_ground',
+        spritePath: '/assets/locations/base/training-ground.png',
+        width: 430,
+        height: 323,
+        hoverScale: 1.012,
+        originX: 0.5,
+        originY: 1,
+        x: 0.600,
+        y: 0.780
     }
 ]
 

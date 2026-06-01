@@ -303,7 +303,11 @@ export class OrderBaseScene extends Phaser.Scene {
         this.locationIcons = {}
         this.hideHoverLabel()
 
-        baseBuildings.forEach((location) => {
+        const locationsByDepth = [...baseBuildings].sort((a, b) => {
+            return (a.y ?? 0) - (b.y ?? 0)
+        })
+
+        locationsByDepth.forEach((location) => {
             const point = this.getMapImagePoint(location)
             const textureKey = location.sprite || location.icon
             const normalSize = this.getLocationSpriteSize(location)

@@ -83,13 +83,13 @@ export const baseBuildings = [
         icon: 'icon_training',
         sprite: 'location_training_ground',
         spritePath: '/assets/locations/base/training-ground.png',
-        width: 430,
-        height: 323,
+        width: 340,
+        height: 255,
         hoverScale: 1.012,
         originX: 0.5,
         originY: 1,
-        x: 0.600,
-        y: 0.780
+        x: 0.555,
+        y: 0.755
     }
 ]
 

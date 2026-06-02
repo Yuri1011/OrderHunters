@@ -6,8 +6,8 @@ export const baseBuildings = [
         icon: 'icon_forge',
         sprite: 'location_forge',
         spritePath: '/assets/locations/base/forge.png',
-        width: 330,
-        height: 266,
+        width: 305,
+        height: 246,
         hoverScale: 1.015,
         originX: 0.5,
         originY: 1,
@@ -65,8 +65,15 @@ export const baseBuildings = [
         title: 'Место отдыха',
         subtitle: 'Восстановление сил',
         icon: 'icon_rest',
-        x: 0.860,
-        y: 0.640
+        sprite: 'location_rest',
+        spritePath: '/assets/locations/base/rest.png',
+        width: 380,
+        height: 285,
+        hoverScale: 1.012,
+        originX: 0.5,
+        originY: 1,
+        x: 0.650,
+        y: 0.875
     },
     {
         id: 'contracts',
@@ -83,12 +90,12 @@ export const baseBuildings = [
         icon: 'icon_training',
         sprite: 'location_training_ground',
         spritePath: '/assets/locations/base/training-ground.png',
-        width: 300,
-        height: 225,
+        width: 360,
+        height: 270,
         hoverScale: 1.012,
         originX: 0.5,
         originY: 1,
-        x: 0.835,
+        x: 0.852,
         y: 0.930
     }
 ]

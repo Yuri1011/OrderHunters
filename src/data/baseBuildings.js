@@ -6,13 +6,13 @@ export const baseBuildings = [
         icon: 'icon_forge',
         sprite: 'location_forge',
         spritePath: '/assets/locations/base/forge.png',
-        width: 275,
-        height: 222,
+        width: 255,
+        height: 206,
         hoverScale: 1.015,
         originX: 0.5,
         originY: 1,
-        x: 0.125,
-        y: 0.780
+        x: 0.135,
+        y: 0.785
     },
     {
         id: 'council',
@@ -21,13 +21,13 @@ export const baseBuildings = [
         icon: 'icon_council',
         sprite: 'location_citadel',
         spritePath: '/assets/locations/base/citadel.png',
-        width: 600,
-        height: 450,
+        width: 585,
+        height: 439,
         hoverScale: 1.012,
         originX: 0.5,
         originY: 1,
         x: 0.515,
-        y: 0.595
+        y: 0.590
     },
     {
         id: 'infirmary',
@@ -36,13 +36,13 @@ export const baseBuildings = [
         icon: 'icon_infirmary',
         sprite: 'location_infirmary',
         spritePath: '/assets/locations/base/infirmary.png',
-        width: 345,
-        height: 291,
+        width: 325,
+        height: 274,
         hoverScale: 1.012,
         originX: 0.5,
         originY: 1,
-        x: 0.350,
-        y: 0.700
+        x: 0.335,
+        y: 0.705
     },
     {
         id: 'barracks',
@@ -51,21 +51,21 @@ export const baseBuildings = [
         icon: 'icon_barracks',
         sprite: 'location_barracks',
         spritePath: '/assets/locations/base/barracks.png',
-        width: 420,
-        height: 320,
+        width: 395,
+        height: 301,
         hoverScale: 1.015,
         originX: 0.5,
         originY: 1,
-        x: 0.830,
-        y: 0.675
+        x: 0.815,
+        y: 0.670
     },
     {
         id: 'quarters',
         title: 'Квартира охотника',
         subtitle: 'Личные покои',
         icon: 'icon_quarters',
-        x: 0.800,
-        y: 0.300
+        x: 0.815,
+        y: 0.305
     },
     {
         id: 'rest',
@@ -74,21 +74,21 @@ export const baseBuildings = [
         icon: 'icon_rest',
         sprite: 'location_rest',
         spritePath: '/assets/locations/base/rest.png',
-        width: 520,
-        height: 390,
+        width: 470,
+        height: 353,
         hoverScale: 1.012,
         originX: 0.5,
         originY: 1,
-        x: 0.735,
-        y: 0.890
+        x: 0.710,
+        y: 0.875
     },
     {
         id: 'contracts',
         title: 'Доска контрактов',
         subtitle: 'Задания для охотников',
         icon: 'icon_contracts',
-        x: 0.350,
-        y: 0.520
+        x: 0.295,
+        y: 0.640
     },
     {
         id: 'training',
@@ -97,13 +97,13 @@ export const baseBuildings = [
         icon: 'icon_training',
         sprite: 'location_training_ground',
         spritePath: '/assets/locations/base/training-ground.png',
-        width: 300,
-        height: 225,
+        width: 270,
+        height: 203,
         hoverScale: 1.012,
         originX: 0.5,
         originY: 1,
-        x: 0.900,
-        y: 0.900
+        x: 0.895,
+        y: 0.885
     }
 ]
 
